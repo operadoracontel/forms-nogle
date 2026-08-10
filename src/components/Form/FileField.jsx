@@ -1,0 +1,106 @@
+import React, { useRef } from 'react';
+import {
+    Box,
+    Button,
+    FormControl,
+    FormErrorMessage,
+    FormHelperText,
+    FormLabel,
+    HStack,
+    Icon,
+    IconButton,
+    Text,
+} from '@chakra-ui/react';
+import { FaCloudUploadAlt, FaFileAlt, FaTimes } from 'react-icons/fa';
+
+import { formatFileSize } from '../../utils/format';
+
+// Upload de arquivo único. Área grande e clicável para funcionar bem no celular.
+const FileField = ({ label, value, onChange, error, helper, accept, isRequired }) => {
+    const inputRef = useRef(null);
+
+    const handleSelect = (event) => {
+        const file = event.target.files?.[0] || null;
+        onChange(file);
+    };
+
+    const handleClear = () => {
+        if (inputRef.current) {
+            inputRef.current.value = '';
+        }
+
+        onChange(null);
+    };
+
+    return (
+        <FormControl isInvalid={Boolean(error)} isRequired={isRequired}>
+            <FormLabel>{label}</FormLabel>
+
+            <input
+                ref={inputRef}
+                type="file"
+                accept={accept}
+                onChange={handleSelect}
+                style={{ display: 'none' }}
+            />
+
+            {value ? (
+                <HStack
+                    bg="surfaceRaised"
+                    border="1px solid"
+                    borderColor="borderPrimary"
+                    borderRadius="lg"
+                    p={3}
+                    spacing={3}
+                >
+                    <Icon as={FaFileAlt} color="secondary" boxSize={5} />
+
+                    <Box flex="1" minW={0}>
+                        <Text fontSize="sm" fontWeight={600} color="textPrimary" noOfLines={1}>
+                            {value.name}
+                        </Text>
+                        <Text fontSize="xs" color="textMuted">
+                            {formatFileSize(value.size)}
+                        </Text>
+                    </Box>
+
+                    <IconButton
+                        aria-label="Remover arquivo"
+                        icon={<FaTimes />}
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleClear}
+                    />
+                </HStack>
+            ) : (
+                <Button
+                    onClick={() => inputRef.current?.click()}
+                    variant="outline"
+                    w="100%"
+                    h="auto"
+                    py={6}
+                    borderStyle="dashed"
+                    borderWidth="2px"
+                    flexDirection="column"
+                    gap={2}
+                    fontWeight={600}
+                >
+                    <Icon as={FaCloudUploadAlt} boxSize={6} color="secondary" />
+                    <Text fontSize="sm">Selecionar arquivo</Text>
+                </Button>
+            )}
+
+            {error ? (
+                <FormErrorMessage>{error}</FormErrorMessage>
+            ) : (
+                helper && (
+                    <FormHelperText fontSize="xs" color="textMuted">
+                        {helper}
+                    </FormHelperText>
+                )
+            )}
+        </FormControl>
+    );
+};
+
+export default FileField;

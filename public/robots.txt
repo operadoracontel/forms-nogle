@@ -1,0 +1,4 @@
+# https://www.robotstxt.org/robotstxt.html
+# Formulario acessado por link privado: nao deve ser indexado.
+User-agent: *
+Disallow: /
