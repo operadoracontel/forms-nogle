@@ -47,4 +47,4 @@ Formulário público, sem tela de login, acessado por link único gerado dentro 
 | Frontend | `forms-nogle` | este repositório |
 | Endpoints | `cartman` | `src/controllers/brandFormController.js`, `src/modules/brandForm*.js`, `src/middlewares/brandFormMiddleware.js` |
 | Botão e geração do token | `sistema-contel` | `conteltelecom/web/franquia/marcas/detalhes-marca.aspx(.vb)` |
-| Tabelas | banco Contel | `docs/sql/2026-08-10-formulario-marca.sql` |
+| Tabelas | banco `conteltelecom` | `docs/sql/` (anexos reusam a `AG_ANEXOS_GERAL` do ERP) |

@@ -9,15 +9,20 @@ import {
     HStack,
     Icon,
     IconButton,
+    Image,
     Text,
 } from '@chakra-ui/react';
 import { FaCloudUploadAlt, FaFileAlt, FaTimes } from 'react-icons/fa';
 
 import { formatFileSize } from '../../utils/format';
+import { useObjectUrl } from '../../hooks/useObjectUrl';
 
 // Upload de arquivo único. Área grande e clicável para funcionar bem no celular.
+// Quando o arquivo é imagem, mostra a miniatura — o cliente confere na hora se
+// mandou o arquivo certo.
 const FileField = ({ label, value, onChange, error, helper, accept, isRequired }) => {
     const inputRef = useRef(null);
+    const previewUrl = useObjectUrl(value);
 
     const handleSelect = (event) => {
         const file = event.target.files?.[0] || null;
@@ -53,7 +58,31 @@ const FileField = ({ label, value, onChange, error, helper, accept, isRequired }
                     p={3}
                     spacing={3}
                 >
-                    <Icon as={FaFileAlt} color="secondary" boxSize={5} />
+                    {previewUrl ? (
+                        <Box
+                            w="56px"
+                            h="56px"
+                            borderRadius="md"
+                            bg="surface"
+                            border="1px solid"
+                            borderColor="borderPrimary"
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                            p={1}
+                            flexShrink={0}
+                        >
+                            <Image
+                                src={previewUrl}
+                                alt={`Prévia de ${label}`}
+                                maxH="100%"
+                                maxW="100%"
+                                objectFit="contain"
+                            />
+                        </Box>
+                    ) : (
+                        <Icon as={FaFileAlt} color="secondary" boxSize={5} />
+                    )}
 
                     <Box flex="1" minW={0}>
                         <Text fontSize="sm" fontWeight={600} color="textPrimary" noOfLines={1}>

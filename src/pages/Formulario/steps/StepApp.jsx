@@ -5,11 +5,14 @@ import { FaMobileAlt } from 'react-icons/fa';
 import SectionCard from '../../../components/Form/SectionCard';
 import TextField from '../../../components/Form/TextField';
 import ColorField from '../../../components/Form/ColorField';
+import BrandPreview from '../../../components/Preview/BrandPreview';
+import { useObjectUrl } from '../../../hooks/useObjectUrl';
 import { APP_LONG_DESCRIPTION_TEMPLATE } from '../constants';
 
 // Etapa condicional: só entra no fluxo quando "Aplicativo Mobile" foi contratado.
 const StepApp = ({ form, errors, setField }) => {
     const brandName = form.companyName?.trim() || '[Nome da sua Marca]';
+    const logoUrl = useObjectUrl(form.logo);
 
     const applyTemplate = () => {
         setField(
@@ -72,6 +75,16 @@ const StepApp = ({ form, errors, setField }) => {
                     helper="Formato HEX (ex: #021E00)."
                 />
             </SimpleGrid>
+
+            <BrandPreview
+                variant="app"
+                title="Como fica o seu aplicativo"
+                hint="Compare com a sua logo: se a cor sumir contra ela, escolha outra."
+                primaryColor={form.appColorOne}
+                secondaryColor={form.appColorTwo}
+                logoUrl={logoUrl}
+                brandName={form.appName || form.companyName}
+            />
 
             <TextField
                 label="Descrição curta"

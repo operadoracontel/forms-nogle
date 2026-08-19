@@ -12,6 +12,11 @@
 /* ---------------------------------------------------------------------------
    1) Link do formulario (token opaco por marca)
    status_FORMULARIO_MARCA: PENDENTE | CONCLUIDO | CANCELADO
+
+   id_PS_PESSOA_inc / id_PS_PESSOA_alt seguem o padrao do ERP (sem sufixo da
+   tabela) e recebem Session("id_PS_PESSOA_USUARIO") de quem gerou o link.
+   As demais tabelas nao tem essas colunas: quem preenche o formulario e o
+   cliente da marca, que nao tem PS_PESSOA no sistema.
    --------------------------------------------------------------------------- */
 IF OBJECT_ID('dbo.FORMULARIO_MARCA', 'U') IS NULL
 BEGIN
@@ -23,9 +28,11 @@ BEGIN
             CONSTRAINT DF_FORMULARIO_MARCA_status DEFAULT (N'PENDENTE'),
         dtInc_FORMULARIO_MARCA           DATETIME       NOT NULL
             CONSTRAINT DF_FORMULARIO_MARCA_dtInc DEFAULT (GETDATE()),
+        dtAlt_FORMULARIO_MARCA           DATETIME       NULL,
         dtExpiracao_FORMULARIO_MARCA     DATETIME       NULL,
         dtEnvio_FORMULARIO_MARCA         DATETIME       NULL,
-        id_USUARIOS_inc_FORMULARIO_MARCA BIGINT         NULL,
+        id_PS_PESSOA_inc                 BIGINT         NULL,
+        id_PS_PESSOA_alt                 BIGINT         NULL,
         ip_envio_FORMULARIO_MARCA        NVARCHAR(60)   NULL,
         st_FORMULARIO_MARCA              BIT            NOT NULL
             CONSTRAINT DF_FORMULARIO_MARCA_st DEFAULT (1),
@@ -79,6 +86,11 @@ BEGIN
         app_desc_curta_FORMULARIO_MARCA_RESPOSTA   NVARCHAR(400)  NULL,
         app_desc_longa_FORMULARIO_MARCA_RESPOSTA   NVARCHAR(MAX)  NULL,
 
+        /* Arquivos: ficam na AG_ANEXOS_GERAL (tabela geral de anexos do ERP).
+           INT porque id_AG_ANEXOS_GERAL e INT, nao BIGINT. */
+        logo_id_AG_ANEXOS_GERAL                    INT            NULL,
+        manual_marca_id_AG_ANEXOS_GERAL            INT            NULL,
+
         dtInc_FORMULARIO_MARCA_RESPOSTA            DATETIME       NOT NULL
             CONSTRAINT DF_FORMULARIO_MARCA_RESPOSTA_dtInc DEFAULT (GETDATE()),
 
@@ -112,36 +124,25 @@ END
 GO
 
 /* ---------------------------------------------------------------------------
-   4) Arquivos enviados (logo, manual de marca) — armazenados no S3
-   tipo_FORMULARIO_MARCA_ARQUIVO: LOGO | MANUAL_MARCA
-   --------------------------------------------------------------------------- */
-IF OBJECT_ID('dbo.FORMULARIO_MARCA_ARQUIVO', 'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.FORMULARIO_MARCA_ARQUIVO (
-        id_FORMULARIO_MARCA_ARQUIVO       BIGINT IDENTITY(1,1) NOT NULL,
-        id_FORMULARIO_MARCA               BIGINT         NOT NULL,
-        tipo_FORMULARIO_MARCA_ARQUIVO     NVARCHAR(30)   NOT NULL,
-        nome_FORMULARIO_MARCA_ARQUIVO     NVARCHAR(255)  NOT NULL,
-        chave_FORMULARIO_MARCA_ARQUIVO    NVARCHAR(500)  NOT NULL,
-        url_FORMULARIO_MARCA_ARQUIVO      NVARCHAR(MAX)  NOT NULL,
-        tamanho_FORMULARIO_MARCA_ARQUIVO  BIGINT         NULL,
-        dtInc_FORMULARIO_MARCA_ARQUIVO    DATETIME       NOT NULL
-            CONSTRAINT DF_FORMULARIO_MARCA_ARQUIVO_dtInc DEFAULT (GETDATE()),
-        CONSTRAINT PK_FORMULARIO_MARCA_ARQUIVO PRIMARY KEY CLUSTERED (id_FORMULARIO_MARCA_ARQUIVO),
-        CONSTRAINT FK_FORMULARIO_MARCA_ARQUIVO_FORMULARIO_MARCA
-            FOREIGN KEY (id_FORMULARIO_MARCA) REFERENCES dbo.FORMULARIO_MARCA (id_FORMULARIO_MARCA)
-    );
+   4) Arquivos enviados (logo, manual de marca)
 
-    CREATE NONCLUSTERED INDEX IX_FORMULARIO_MARCA_ARQUIVO_formulario
-        ON dbo.FORMULARIO_MARCA_ARQUIVO (id_FORMULARIO_MARCA);
-END
-GO
+   NAO existe tabela propria: os arquivos vao para dbo.AG_ANEXOS_GERAL, a tabela
+   geral de anexos do ERP, e a resposta guarda os ids em
+   logo_id_AG_ANEXOS_GERAL / manual_marca_id_AG_ANEXOS_GERAL.
+
+   AG_ANEXOS_GERAL exige id_PS_PESSOA_inc / id_PS_PESSOA_alt NOT NULL; como quem
+   envia o formulario e o cliente da marca (sem PS_PESSOA), grava-se o
+   id_PS_PESSOA_inc de quem gerou o link no ERP.
+   --------------------------------------------------------------------------- */
 
 /* ============================================================================
    ROLLBACK (executar na ordem — dependencias de FK)
 
-   DROP TABLE dbo.FORMULARIO_MARCA_ARQUIVO;
    DROP TABLE dbo.FORMULARIO_MARCA_PRODUTO;
    DROP TABLE dbo.FORMULARIO_MARCA_RESPOSTA;
    DROP TABLE dbo.FORMULARIO_MARCA;
+
+   Os anexos gravados em AG_ANEXOS_GERAL nao sao removidos por este rollback:
+   sao dados compartilhados com o resto do ERP. Para limpar so os do formulario,
+   usar os ids guardados em FORMULARIO_MARCA_RESPOSTA ANTES do drop.
    ============================================================================ */

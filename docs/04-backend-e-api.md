@@ -3,91 +3,309 @@
 O backend é a API **Cartman** (repositório `cartman`, Node 22 + MVC), apontada por
 `REACT_APP_API_URL`. O front fala com ela via axios (`src/services/api.jsx`).
 
-As duas rotas são **públicas de propósito**: não passam pelo middleware `auth`,
-porque quem acessa é o cliente da marca. O token opaco da URL é a credencial.
+Este documento é a **referência completa dos endpoints do formulário**. Toda a
+documentação de API do NOGLE-27602 vive aqui, não espalhada pelos outros repositórios.
 
-## Endpoints
+Arquivos no Cartman:
 
-| Método | Rota | Corpo | Uso |
-| --- | --- | --- | --- |
-| GET | `/brand-form/:token` | — | Resolve o link e devolve os dados de apresentação. |
-| POST | `/brand-form/:token` | `multipart/form-data` | Grava a resposta e fecha o link. |
+| Arquivo | Papel |
+| --- | --- |
+| `src/router.js` | Registro das rotas |
+| `src/controllers/brandFormController.js` | Request/response |
+| `src/middlewares/brandFormMiddleware.js` | Upload, validação e gate de admin |
+| `src/modules/brandFormModule.js` | Acesso a dados |
+| `src/modules/brandFormCryptoModule.js` | AES-256-GCM da senha do domínio |
 
-### GET `/brand-form/:token`
+---
 
-Resposta `200`:
+## Visão geral das rotas
+
+| Método | Rota | Acesso |
+| --- | --- | --- |
+| GET | `/brand-form/:token` | **Público** |
+| POST | `/brand-form/:token` | **Público** |
+| GET | `/brand-form/brand/:brandId` | `auth` (JWT) |
+| GET | `/brand-form/brand/:brandId/domain-access` | `auth` + **admin** |
+| DELETE | `/brand-form/brand/:brandId/domain-access` | `auth` + **admin** |
+
+`:token` é o token opaco do link, gerado no ERP.
+`:brandId` é o `id_FRANQUIA_MARCA_PROPRIA`.
+
+As duas primeiras são públicas **de propósito**: quem acessa é o cliente da marca, que
+não tem usuário no ERP. O token é a única credencial e vale um envio só.
+
+---
+
+## 1. GET `/brand-form/:token`
+
+Resolve o link e devolve os dados de apresentação. É o que a tela do formulário chama
+ao abrir. **Sem autenticação.**
+
+### Resposta `200`
 
 ```json
 {
-  "brandName": "Minha Operadora",
+  "brandName": "PAFER TESTE",
   "products": ["Site Web", "Aplicativo Mobile", "Link de recarga facil", "Solucao de Vendas", "Notify"],
   "expiresAt": null
 }
 ```
 
-`brandName` já vem preenchido no primeiro campo do formulário.
+`brandName` já vem preenchido no primeiro campo do formulário. `expiresAt` nulo
+significa link sem prazo.
 
-### POST `/brand-form/:token`
+### Erros
 
-Campos do `FormData`:
-
-| Campo | Tipo | Conteúdo |
+| Status | `reason` | Quando |
 | --- | --- | --- |
-| `payload` | string | JSON com todos os campos de texto. |
-| `logo` | arquivo | Opcional. PNG, JPG ou PDF, até 20MB. |
-| `brandManual` | arquivo | Opcional. PDF, PNG, JPG ou ZIP, até 20MB. |
-
-Chaves do `payload`: `companyName`, `contactWhatsapp`, `products[]`, `primaryColor`,
-`secondaryColor`, `website`, `domainRegistrar`, `domainLogin`, `domainPassword`,
-`domainNotes`, `phone0800`, `brandWhatsapp` e — só quando o app foi contratado —
-`appName`, `appAddress`, `appColorOne`, `appColorTwo`, `appShortDescription`,
-`appLongDescription`.
-
-Os valores de `products` precisam bater **exatamente** com `AVAILABLE_PRODUCTS`
-(`cartman/src/modules/brandFormModule.js`), que segue o padrão do projeto e não usa
-acento. O front guarda esses valores em `PRODUCTS[].value` e exibe `PRODUCTS[].label`.
-
-Resposta `201`:
+| `404` | `NOT_FOUND` | Token inexistente, `st = 0`, ou status inesperado |
+| `409` | `ALREADY_SUBMITTED` | A marca já enviou; vem `submittedAt` |
+| `410` | `EXPIRED` | `dtExpiracao_FORMULARIO_MARCA` no passado (30 dias por padrão) |
+| `429` | — | Mais de 60 leituras do mesmo IP em 10 minutos; vem `Retry-After` |
+| `500` | — | Erro interno (mensagem genérica; detalhe só no log) |
 
 ```json
-{ "message": "Formulario enviado com sucesso.", "brandName": "Minha Operadora" }
+{ "message": "Link do formulario nao encontrado.", "reason": "NOT_FOUND", "status": 404, "submittedAt": null }
 ```
 
-## Códigos de retorno
+---
 
-| Status | `reason` | Significado | Tela |
+## 2. POST `/brand-form/:token`
+
+Grava a resposta e fecha o link. `multipart/form-data`. **Sem autenticação.**
+
+### Corpo
+
+| Campo | Tipo | Obrigatório | Regras |
 | --- | --- | --- | --- |
-| `400` | — | Validação de campos; vem `errors` (array de mensagens). | Toast com a lista |
-| `404` | `NOT_FOUND` | Token inexistente, inativo ou em status inesperado. | `LinkInvalido` |
-| `409` | `ALREADY_SUBMITTED` | A marca já enviou; vem `submittedAt`. | `JaEnviado` |
-| `410` | `EXPIRED` | `dtExpiracao_FORMULARIO_MARCA` no passado. | `LinkExpirado` |
-| `500` | — | Erro interno. | Toast genérico |
+| `payload` | string (JSON) | sim | Ver tabela abaixo |
+| `logo` | arquivo | não | PNG, JPG ou PDF. Máx **20MB** |
+| `brandManual` | arquivo | não | PDF, PNG, JPG ou ZIP. Máx **20MB** |
 
-`extractReason` e `extractErrors` (`src/services/api.jsx`) normalizam essas respostas.
+Limites aplicados no multer, antes de bufferizar em memória: 2 arquivos, 10 campos,
+256KB por campo de texto, 20MB por arquivo.
 
-## Validação
+O conteúdo do arquivo é conferido por **magic bytes**, não só pelo `Content-Type`
+declarado: PNG, JPG e PDF no logo; PNG, JPG, PDF e ZIP no manual.
 
-`src/pages/Formulario/validation.js` espelha
-`cartman/src/middlewares/brandFormMiddleware.js`. Regras:
+### Chaves do `payload`
 
-- **Obrigatórios sempre:** nome da empresa, WhatsApp do responsável (10 a 13 dígitos)
-  e ao menos um produto.
-- **Cores:** formato HEX (`#RGB` ou `#RRGGBB`) quando preenchidas.
-- **0800 / WhatsApp da marca:** opcionais, mas com contagem de dígitos validada.
-- **Aplicativo Mobile selecionado:** nome, endereço, cor primária, descrição curta e
-  descrição longa passam a ser obrigatórios.
-- **Regra extra só do front:** a cor primária do app não pode ser igual à cor
-  principal da marca (o Jira pede o aviso; aqui vira bloqueio, com mensagem
-  explicando a perda de contraste).
-- **Domínio:** nenhum campo é obrigatório — a issue não os marca como tal. O peso
-  vem do destaque visual e do aviso exibido quando a seção fica vazia.
+| Chave | Obrigatória | Validação |
+| --- | --- | --- |
+| `companyName` | **sim** | Não vazio |
+| `contactWhatsapp` | **sim** | 10 a 13 dígitos |
+| `products` | **sim** | Array, ao menos 1, valores de `AVAILABLE_PRODUCTS` |
+| `primaryColor` / `secondaryColor` | não | HEX (`#RGB` ou `#RRGGBB`) |
+| `website` | não | Texto livre, até 300 |
+| `domainRegistrar` | não | Até 200 |
+| `domainLogin` | não | Até 200 |
+| `domainPassword` | não | **Cifrada** antes de gravar |
+| `domainNotes` | não | Texto longo |
+| `phone0800` | não | 10 ou 11 dígitos |
+| `brandWhatsapp` | não | 10 a 13 dígitos |
+| `appName` | condicional¹ | Até 200 |
+| `appAddress` | condicional¹ | Até 400 |
+| `appColorOne` | condicional¹ | HEX |
+| `appColorTwo` | não | HEX |
+| `appShortDescription` | condicional¹ | Até 400 |
+| `appLongDescription` | condicional¹ | Texto longo |
 
-O backend continua sendo a autoridade: qualquer coisa que passe no front é
-revalidada antes de gravar.
+¹ Obrigatórios **apenas** quando `products` inclui `"Aplicativo Mobile"`.
 
-## Transação e concorrência
+> **Atenção aos valores de `products`:** trafegam **sem acento**, porque o padrão do
+> Cartman proíbe acento em string — `"Link de recarga facil"`, `"Solucao de Vendas"`.
+> O front guarda esse valor em `PRODUCTS[].value` e exibe `PRODUCTS[].label` com acento.
+> Mudar um lado sem o outro faz o backend responder `Produto invalido`.
 
-`saveFormSubmission` abre transação e **fecha o link primeiro**, com
-`UPDATE ... WHERE status = 'PENDENTE'`. Se `rowsAffected` for zero, outro envio
-chegou antes: rollback e `409`. Só depois entram a resposta, os produtos e os
-arquivos. Assim dois envios simultâneos nunca geram duas respostas.
+### Resposta `201`
+
+```json
+{ "message": "Formulario enviado com sucesso.", "brandName": "PAFER TESTE" }
+```
+
+### Erros
+
+| Status | Quando | Corpo |
+| --- | --- | --- |
+| `400` | Validação de campo | `errors`: array de mensagens em português |
+| `404` / `409` / `410` | Mesmos estados do GET | `reason` |
+| `413` | Arquivo ou campo acima do limite | `errors` |
+| `429` | Mais de 10 envios do mesmo IP em 10 minutos | `errors` + header `Retry-After` |
+| `500` | Erro interno | Mensagem genérica |
+
+```json
+{
+  "message": "Formulario incompleto.",
+  "status": 400,
+  "errors": [
+    "Informe o WhatsApp do responsavel para contato.",
+    "Selecione ao menos um produto da Nogle contratado."
+  ]
+}
+```
+
+### O que acontece no servidor
+
+1. Rate limit por IP (10 envios / 10 min).
+2. Multer recebe o upload respeitando os limites.
+3. `validateSubmission` valida campos e assinatura dos arquivos, e monta
+   `req.brandFormPayload`.
+4. Confere o estado do link e se a marca já enviou antes.
+5. Sobe os arquivos para o S3 em `formulario-marca/<brandId>/<tipo>-<nome>`.
+6. Abre transação:
+   - `UPDATE FORMULARIO_MARCA SET status='CONCLUIDO' WHERE id=@id AND status='PENDENTE'`
+     — zero linhas afetadas significa envio concorrente: rollback e `409`.
+   - Insere os anexos em `AG_ANEXOS_GERAL` e guarda os ids.
+   - Insere a resposta, com a senha **cifrada**.
+   - Insere os produtos.
+7. Commit.
+
+---
+
+## 3. GET `/brand-form/brand/:brandId`
+
+Tudo que a marca respondeu. **Exige `auth`** (Bearer JWT).
+
+**Não devolve senha, login nem observações de acesso ao domínio** — só o sinalizador
+`tem_acesso_dominio`.
+
+### Resposta `200` — formulário enviado
+
+```json
+{
+  "status": "CONCLUIDO",
+  "onboarding": {
+    "id_formulario": "2",
+    "status": "CONCLUIDO",
+    "gerado_em": "2026-08-11T15:54:53.070Z",
+    "enviado_em": "2026-08-11T15:57:48.713Z",
+    "nome_empresa": "A VIAGEM PHONE",
+    "whatsapp_responsavel": "54656456456",
+    "cor_principal": "#1C19B3",
+    "cor_secundaria": "#4ABFB8",
+    "site": "adsdasdasdasd.com",
+    "registrador": "tertertertert",
+    "telefone_0800": "08005663453",
+    "whatsapp_marca": "23423425245",
+    "app_nome": "ffggdfgdfgdfg",
+    "app_endereco": "dfgdfgdfgdfgdfg",
+    "app_cor_1": "#1E13BE",
+    "app_cor_2": "#238EA9",
+    "app_desc_curta": "...",
+    "app_desc_longa": "...",
+    "tem_acesso_dominio": true,
+    "logo_url": "https://s3.amazonaws.com/s3-contel-imagens-aplicacao/formulario-marca/75/logo-....png",
+    "logo_nome": "Captura de tela 2026-03-24 115043.png",
+    "manual_url": null,
+    "manual_nome": null,
+    "produtos": ["Site Web", "Link de recarga facil", "Notify", "Solucao de Vendas", "Aplicativo Mobile"]
+  }
+}
+```
+
+### Resposta `200` — outros estados
+
+```json
+{ "status": "PENDENTE", "onboarding": null, "geradoEm": "2026-08-11T10:29:45.083Z" }
+```
+
+```json
+{ "status": "SEM_LINK", "onboarding": null }
+```
+
+| `status` | Significado |
+| --- | --- |
+| `CONCLUIDO` | Marca preencheu; `onboarding` vem completo |
+| `PENDENTE` | Link gerado, aguardando preenchimento |
+| `SEM_LINK` | Nunca foi gerado link para essa marca |
+
+### Erros
+
+`401` sem token ou token inválido · `500` erro interno.
+
+---
+
+## 4. GET `/brand-form/brand/:brandId/domain-access`
+
+Acesso ao painel onde o domínio foi registrado, **com a senha decifrada**.
+
+**Exige `auth` + `requireBrandFormAdmin`.**
+
+### Resposta `200`
+
+```json
+{
+  "formId": "2",
+  "submittedAt": "2026-08-11T15:57:48.713Z",
+  "registrar": "Registro.br",
+  "website": "pafer.com.br",
+  "login": "admin@pafer.com.br",
+  "password": "<senha decifrada>",
+  "notes": "Autenticacao em duas etapas ativa"
+}
+```
+
+`password` vem `null` quando já foi purgada ou nunca foi informada.
+
+### Erros
+
+| Status | Quando |
+| --- | --- |
+| `401` | Sem JWT ou JWT inválido |
+| `403` | JWT válido mas o usuário não é admin, ou token sem email |
+| `404` | A marca ainda não enviou o formulário |
+
+### Auditoria
+
+Grava em `FORMULARIO_MARCA_ACESSO` **antes** de responder — ação `LEITURA`, email, IP e
+data. Se o registro falhar, a leitura falha junto. Tentativa que não encontrou senha
+também é registrada. Detalhes em [07-seguranca.md](07-seguranca.md).
+
+---
+
+## 5. DELETE `/brand-form/brand/:brandId/domain-access`
+
+Zera a senha do domínio depois que ele já foi apontado. Idempotente.
+
+**Exige `auth` + `requireBrandFormAdmin`.**
+
+### Resposta `200`
+
+```json
+{ "message": "Senha do dominio removida." }
+```
+
+`404` quando a marca não tem formulário enviado. Grava ação `PURGA` na auditoria.
+
+---
+
+## Autenticação
+
+As rotas internas usam o middleware `auth` do Cartman: header
+`Authorization: Bearer <jwt>`, assinado com `JWT_SECRET`.
+
+O Cartman tem **dois fluxos de login** que emitem tokens compatíveis:
+
+| Rota | `id` do token |
+| --- | --- |
+| `POST /authenticate` | `id_PS_PESSOA` (banco `conteltelecom`) |
+| `POST /comercial/login` | `id_USUARIOS_MONITOR_NOGLE` (banco `nogle`) |
+
+São tabelas diferentes no mesmo campo, então **o `id` do token é ambíguo**. O
+identificador confiável é o **email**, presente nos dois. Por isso `middlewares/auth.js`
+expõe `req.userEmail`, e é ele que o gate de admin e a auditoria usam.
+
+`requireBrandFormAdmin` resolve o papel em `USUARIOS_MONITOR_NOGLE` via
+`getColaboradorByEmail` e exige `isWhitelisted` **e** `isAdmin` — a mesma fonte que os
+fronts usam. O gate é no backend porque checagem de UI não protege endpoint.
+
+---
+
+## Tratamento de erros no front
+
+`extractReason` e `extractErrors` (`src/services/api.jsx`) normalizam as respostas:
+
+- `reason` → decide qual tela de estado mostrar
+- `errors` → lista exibida no toast de validação
+- `500` devolve mensagem genérica; o detalhe fica no log do servidor, para não vazar
+  nome de tabela ou coluna

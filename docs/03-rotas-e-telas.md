@@ -54,5 +54,6 @@ na etapa 1 muda o total de etapas e a barra de progresso na hora.
 | `SectionCard` | Cabeçalho da seção com ícone, descrição, selo e modo `highlight` (usado no domínio). |
 | `TextField` | Input ou textarea com label, helper, erro e `fontSize` 16px no mobile (evita zoom do iOS). |
 | `ColorField` | Seletor nativo de cor + campo HEX, sincronizados. |
-| `FileField` | Upload de arquivo único, com nome, tamanho e botão de remover. |
+| `FileField` | Upload de arquivo único, com nome, tamanho e botão de remover. Arquivo de imagem ganha miniatura via `useObjectUrl` (que revoga o blob ao trocar/desmontar). |
 | `ProductPicker` | Cards clicáveis de seleção múltipla dos cinco produtos. |
+| `BrandPreview` | Prévia ao vivo da identidade: `variant="erp"` pinta um painel web com as cores da marca (etapa 2), `variant="app"` pinta um celular com as cores do app (etapa 5). Mostra a logo enviada e legenda com os HEX. Cor vazia ou inválida cai num cinza neutro. |

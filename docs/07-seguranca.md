@@ -50,23 +50,86 @@ credencial de terceiro** e exige cuidado permanente:
   melhor quebrar do que gravar em claro.
 - O payload do formulário **nunca** deve ser logado. Os logs de erro do controller
   registram só a mensagem da exceção.
-- Não existe endpoint de leitura da senha. Quem precisar do acesso decifra por
-  processo controlado, com `decryptSecret`.
+
+### Leitura da senha
+
+Hash não serve aqui: a equipe precisa do texto original para apontar o DNS. Como a
+cifra é reversível por necessidade, o controle real é *quem lê* e *fica registrado*.
+
+| Método | Rota | Uso |
+| --- | --- | --- |
+| GET | `/brand-form/brand/:brandId/domain-access` | Registrador, site, login, senha decifrada e observações. |
+| DELETE | `/brand-form/brand/:brandId/domain-access` | Zera a senha depois do domínio apontado. Idempotente. |
+
+Ambas exigem `auth` **e** `brandFormMiddleware.requireBrandFormAdmin`, que resolve o
+papel em `USUARIOS_MONITOR_NOGLE` (banco `nogle`, via `getColaboradorByEmail`) e exige
+`isWhitelisted` e `isAdmin`. Quem não é admin leva `403` mesmo com JWT válido — o gate
+é no backend porque checagem só de UI não protege endpoint.
+
+As duas gravam em `FORMULARIO_MARCA_ACESSO` — ação (`LEITURA`/`PURGA`), email, IP e
+data — **antes** de responder. Se o registro falhar, a leitura falha junto: não existe
+caminho onde alguém vê a senha sem ficar registrado. Tentativa que não encontrou senha
+também é registrada.
+
+> **Por que o identificador é o email:** o Cartman tem dois fluxos de login.
+> `/authenticate` emite `{ id: id_PS_PESSOA }` (Contel) e `/comercial/login` emite o
+> `id` da `USUARIOS_MONITOR_NOGLE` — tabelas diferentes no mesmo campo do token. O
+> email é o único comum aos dois, então é ele que gate e auditoria usam. O
+> `middlewares/auth.js` expõe `req.userEmail` para isso.
 
 ### Recomendações de operação
 
 - Trocar a chave exige redecifrar as senhas existentes — planejar antes de rotacionar.
-- Combinar com purga: depois que o domínio for apontado, limpar
-  `senha_dominio_FORMULARIO_MARCA_RESPOSTA` reduz a janela de exposição.
-- Sempre que possível, orientar o cliente pelo campo de observações a criar um
-  **usuário convidado** no painel em vez de entregar a senha principal.
+  A chave não tem backup: perdê-la é perder as senhas.
+- Purgar a senha assim que o domínio for apontado (`DELETE` acima). Cada senha apagada
+  é risco eliminado, não mitigado.
+- Auditar periodicamente `FORMULARIO_MARCA_ACESSO`: leitura sem purga na sequência, ou
+  muitas leituras da mesma pessoa, merecem pergunta.
+- **A medida mais forte é não guardar.** Orientar o cliente, pelo campo de observações,
+  a criar um **usuário convidado** no painel do registrador em vez de entregar a senha
+  principal. Acesso delegado é revogável e não expõe a conta.
 
 ## Superfície pública
 
 - As rotas `/brand-form/:token` não usam o middleware `auth` — é intencional e está
   comentado no `router.js` do Cartman.
-- Uploads restritos por MIME type e limitados a 20MB por arquivo; o nome do arquivo é
-  sanitizado antes de virar chave no S3.
+- Upload limitado **no multer**, antes de bufferizar em memória: 20MB por arquivo, 2
+  arquivos, 256KB por campo de texto. Sem isso a rota pública seria um vetor de
+  esgotamento de memória — o arquivo inteiro entraria na RAM antes de qualquer checagem.
+  Estouro devolve `413`.
+- Tipo do arquivo conferido em **duas** camadas: o `mimetype` declarado pelo cliente e a
+  **assinatura real do conteúdo** (magic bytes — PNG `89 50 4E 47 0D 0A 1A 0A`, JPG
+  `FF D8 FF`, PDF `%PDF`, ZIP `PK`). Só o mimetype não bastaria: ele é declarado no
+  multipart e forjável, e o bucket é público — daria para hospedar conteúdo arbitrário
+  num domínio da Nogle.
+- O nome do arquivo é sanitizado antes de virar chave no S3.
+- Erro `500` devolve mensagem genérica. O detalhe fica só no `console.error`, para não
+  vazar nome de tabela, coluna ou servidor numa falha de SQL.
+- **Rate limit por IP** nas rotas públicas, janela deslizante de 10 minutos:
+  60 leituras e 10 envios. Estouro devolve `429` com `Retry-After`.
+  O contador é em memória, então é **por processo** — sob PM2 em cluster cada worker tem
+  o seu. Serve de amortecedor; o limite global deveria vir do proxy/WAF na frente.
+  O próprio mapa de contadores tem teto (10 mil IPs) e varredura, senão viraria o
+  vetor de memória que ele deveria impedir.
+- **Link expira em 30 dias** (`dtExpiracao_FORMULARIO_MARCA`, preenchido no ERP).
+  Link vazado deixa de funcionar sozinho; o Cartman devolve `410 EXPIRED`.
 - `robots.txt` bloqueia indexação e o HTML traz `noindex, nofollow`.
 - `public/.htaccess` aplica HSTS, `X-Frame-Options`, `X-Content-Type-Options`, CSP com
   `frame-ancestors 'self'` e `form-action 'self'`, além de no-cache.
+
+### Anexos no S3
+
+O bucket `s3-contel-imagens-aplicacao` **serve objetos publicamente por URL direta** —
+verificado com `curl` sem credencial, resposta `200`. Isso vale para todo o bucket e é
+anterior a este projeto.
+
+O que o formulário grava lá é **só material gráfico**: logo e manual de marca. A senha
+do registrador nunca sobe para o S3 — fica cifrada no banco.
+
+O caminho é `formulario-marca/<id_FRANQUIA_MARCA_PROPRIA>/<tipo>-<nome>`, previsível
+por escolha: facilita rastrear o arquivo a partir do banco. O efeito colateral aceito é
+que alguém sondando ids consegue inferir quais marcas têm formulário enviado — perda de
+confidencialidade comercial, não de credencial.
+
+Pendente antes de produção: mover esses anexos para um bucket privado com URL assinada
+de validade curta.
