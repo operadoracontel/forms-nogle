@@ -89,6 +89,32 @@ também é registrada.
   a criar um **usuário convidado** no painel do registrador em vez de entregar a senha
   principal. Acesso delegado é revogável e não expõe a conta.
 
+## Validação da segurança
+
+Suite executada em 11/08/2026 contra o **banco local** (Docker, `conteltelecom` e
+`nogle` restaurados), com o Cartman apontado para `localhost`. Todos passaram:
+
+| # | Cenário | Esperado | Resultado |
+| --- | --- | --- | --- |
+| 1 | Executável (header `MZ`) renomeado para `.png`, com `Content-Type: image/png` | rejeitar | `400` — "O conteudo do logo nao corresponde a um PNG, JPG ou PDF" |
+| 2 | Arquivo de 25MB | rejeitar sem estourar memória | `413` |
+| 3 | Link com `dtExpiracao` no passado | bloquear | `410 EXPIRED` |
+| 4 | 62 leituras seguidas do mesmo IP | frear | `429` na 60ª, com `Retry-After: 578` |
+| 5 | `' OR 1=1--` e `'; DROP TABLE FORMULARIO_MARCA;--` no token | tratar como texto | `404`; as 4 tabelas intactas |
+| 6 | Campo de texto com 300 mil caracteres | rejeitar | `413` |
+| 7 | Envio válido com PNG legítimo | aceitar | `201` |
+| 8 | Reenvio no mesmo link | bloquear | `409` |
+| 9 | Dados da marca sem token | negar | `401` |
+| 10 | JWT com assinatura forjada | negar | `401` |
+| 11 | Dados da marca com JWT válido | sem senha/login no corpo | confirmado |
+| 12 | Senha do domínio como não-admin | negar | `403` |
+| 13 | Senha do domínio como admin | decifrar | texto original recuperado |
+| 14 | Purga como não-admin | negar | `403` |
+| 15 | Purga como admin | zerar | `200`, coluna `NULL` |
+| 16 | Auditoria | registrar | `LEITURA` e `PURGA` com email e IP |
+
+Os dados de teste e o objeto que subiu ao S3 foram removidos depois da suite.
+
 ## Superfície pública
 
 - As rotas `/brand-form/:token` não usam o middleware `auth` — é intencional e está
