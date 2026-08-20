@@ -348,7 +348,34 @@ Nenhuma rota usa query string. Só **path param** e **header**.
 | GET `/brand-form/brand/:brandId` | `:brandId` — `id_FRANQUIA_MARCA_PROPRIA`, inteiro | `Authorization: Bearer` |
 | GET/DELETE `.../domain-access` | idem | `Authorization: Bearer` |
 
-`:brandId` é o mesmo id que a tela do ERP usa (`detalhes-marca.aspx?id=75`).
+### A qual coluna cada parâmetro corresponde
+
+| Parâmetro | Coluna | Tabela | Tipo SQL |
+| --- | --- | --- | --- |
+| `:token` | `token_FORMULARIO_MARCA` | `FORMULARIO_MARCA` | `NVARCHAR(64)` |
+| `:brandId` | `id_FRANQUIA_MARCA_PROPRIA` | `FORMULARIO_MARCA` | `BIGINT` |
+
+As consultas fazem exatamente:
+
+```sql
+-- rotas públicas
+WHERE FM.token_FORMULARIO_MARCA = @token
+
+-- rotas internas
+WHERE FM.id_FRANQUIA_MARCA_PROPRIA = @brandId
+```
+
+`id_FRANQUIA_MARCA_PROPRIA` é a chave da marca no ERP — mesma coluna de
+`FRANQUIA_MARCA_PROPRIA`, que é a tabela mestre de marcas. É também o id que a tela usa
+na querystring (`detalhes-marca.aspx?id=75`), então o número é o mesmo nos três lugares:
+URL do ERP, parâmetro da API e chave do banco.
+
+Ambos os parâmetros são passados como `SqlParameter` tipado (`sql.NVarChar(64)` e
+`sql.BigInt`), nunca concatenados — por isso injeção no token retorna `404` em vez de
+executar (cenário 5 da suite em [07-seguranca.md](07-seguranca.md)).
+
+O `:brandId` passa por `Number()` antes de virar parâmetro: valor não numérico vira
+`NaN` e a consulta não casa com nada, devolvendo `SEM_LINK`.
 
 `GET /brand-form/brand/:brandId` responde `200` mesmo quando a marca não tem
 formulário — o que muda é o campo `status` (`CONCLUIDO` / `PENDENTE` / `SEM_LINK`).
