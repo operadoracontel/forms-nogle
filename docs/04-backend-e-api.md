@@ -6,6 +6,27 @@ O backend é a API **Cartman** (repositório `cartman`, Node 22 + MVC), apontada
 Este documento é a **referência completa dos endpoints do formulário**. Toda a
 documentação de API do NOGLE-27602 vive aqui, não espalhada pelos outros repositórios.
 
+## Onde fica cada coisa
+
+O **código que executa** as rotas está no Cartman. O **cliente que as chama** está
+neste repositório, em `src/services/api.jsx` — nenhuma tela monta URL própria.
+
+| Rota | Função cliente (`src/services/api.jsx`) |
+| --- | --- |
+| GET `/brand-form/:token` | `getBrandForm(token)` |
+| POST `/brand-form/:token` | `submitBrandForm(token, formData)` |
+| GET `/brand-form/brand/:brandId` | `getBrandOnboarding(brandId)` |
+| GET `/brand-form/brand/:brandId/domain-access` | `getBrandDomainAccess(brandId)` |
+| DELETE `/brand-form/brand/:brandId/domain-access` | `purgeBrandDomainPassword(brandId)` |
+
+Auxiliares do mesmo arquivo: `extractReason(error)`, `extractErrors(error)`,
+`extractRetryAfter(error)` e `getStoredToken()`.
+
+O interceptor anexa `Authorization: Bearer <jwt>` quando existe token guardado
+(`@ScheduleNogleApp:token`, em `sessionStorage` ou `localStorage` — mesma chave dos
+outros fronts da Nogle). O formulário em si não faz login, então nas rotas públicas o
+header simplesmente não vai. As rotas internas só funcionam com um token válido.
+
 Arquivos no Cartman:
 
 | Arquivo | Papel |
@@ -303,9 +324,13 @@ fronts usam. O gate é no backend porque checagem de UI não protege endpoint.
 
 ## Tratamento de erros no front
 
-`extractReason` e `extractErrors` (`src/services/api.jsx`) normalizam as respostas:
+`src/services/api.jsx` normaliza as respostas:
 
-- `reason` → decide qual tela de estado mostrar
-- `errors` → lista exibida no toast de validação
-- `500` devolve mensagem genérica; o detalhe fica no log do servidor, para não vazar
-  nome de tabela ou coluna
+| Helper | Uso |
+| --- | --- |
+| `extractReason(error)` | Devolve `NOT_FOUND`, `ALREADY_SUBMITTED`, `EXPIRED`, `UNAUTHORIZED`, `FORBIDDEN`, `TOO_LARGE`, `RATE_LIMITED` ou `UNKNOWN` — decide qual tela de estado mostrar |
+| `extractErrors(error)` | Array de mensagens do `400`, exibido no toast de validação |
+| `extractRetryAfter(error)` | Segundos do header `Retry-After` no `429`, para avisar quando tentar de novo |
+
+O `500` devolve mensagem genérica; o detalhe fica no log do servidor, para não vazar
+nome de tabela ou coluna.
