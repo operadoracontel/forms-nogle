@@ -6,6 +6,11 @@ O backend é a API **Cartman** (repositório `cartman`, Node 22 + MVC), apontada
 Este documento é a **referência completa dos endpoints do formulário**. Toda a
 documentação de API do NOGLE-27602 vive aqui, não espalhada pelos outros repositórios.
 
+> **Todos os exemplos usam dados fictícios** (`Marca Exemplo`, `51999990000`,
+> `marcaexemplo.com.br`). Nenhum retorno real de cliente entra nesta documentação:
+> nome de marca, telefone, site e login são dados de terceiros. A senha do domínio
+> nunca aparece nem como exemplo — só o formato do campo.
+
 ## Onde fica cada coisa
 
 O **código que executa** as rotas está no Cartman. O **cliente que as chama** está
@@ -66,7 +71,7 @@ ao abrir. **Sem autenticação.**
 
 ```json
 {
-  "brandName": "PAFER TESTE",
+  "brandName": "Marca Exemplo",
   "products": ["Site Web", "Aplicativo Mobile", "Link de recarga facil", "Solucao de Vendas", "Notify"],
   "expiresAt": null
 }
@@ -85,9 +90,36 @@ significa link sem prazo.
 | `429` | — | Mais de 60 leituras do mesmo IP em 10 minutos; vem `Retry-After` |
 | `500` | — | Erro interno (mensagem genérica; detalhe só no log) |
 
+Exemplos de cada desfecho:
+
 ```json
+// 404 — token nao existe, foi revogado (st = 0) ou esta em status inesperado
 { "message": "Link do formulario nao encontrado.", "reason": "NOT_FOUND", "status": 404, "submittedAt": null }
 ```
+
+```json
+// 409 — a marca ja preencheu; o front usa submittedAt para mostrar a data
+{
+  "message": "Este formulario ja foi enviado.",
+  "reason": "ALREADY_SUBMITTED",
+  "status": 409,
+  "submittedAt": "2026-08-20T16:52:41.867Z"
+}
+```
+
+```json
+// 410 — passou dos 30 dias
+{
+  "message": "Este link expirou. Fale com a equipe Nogle para receber um novo.",
+  "reason": "EXPIRED",
+  "status": 410,
+  "submittedAt": null
+}
+```
+
+Este endpoint devolve **apenas** o necessário para montar a tela. Não expõe nada do que
+a marca respondeu — nem em `409`, quando o formulário já existe. Quem consulta resposta
+é o endpoint 3, que exige JWT.
 
 ---
 
@@ -141,7 +173,7 @@ declarado: PNG, JPG e PDF no logo; PNG, JPG, PDF e ZIP no manual.
 ### Resposta `201`
 
 ```json
-{ "message": "Formulario enviado com sucesso.", "brandName": "PAFER TESTE" }
+{ "message": "Formulario enviado com sucesso.", "brandName": "Marca Exemplo" }
 ```
 
 ### Erros
@@ -196,30 +228,30 @@ Tudo que a marca respondeu. **Exige `auth`** (Bearer JWT).
 {
   "status": "CONCLUIDO",
   "onboarding": {
-    "id_formulario": "2",
+    "id_formulario": "1",
     "status": "CONCLUIDO",
-    "gerado_em": "2026-08-11T15:54:53.070Z",
-    "enviado_em": "2026-08-11T15:57:48.713Z",
-    "nome_empresa": "A VIAGEM PHONE",
-    "whatsapp_responsavel": "54656456456",
+    "gerado_em": "2026-08-20T16:52:00.470Z",
+    "enviado_em": "2026-08-20T16:52:41.867Z",
+    "nome_empresa": "Marca Exemplo Ltda",
+    "whatsapp_responsavel": "51999990000",
     "cor_principal": "#1C19B3",
     "cor_secundaria": "#4ABFB8",
-    "site": "adsdasdasdasd.com",
-    "registrador": "tertertertert",
-    "telefone_0800": "08005663453",
-    "whatsapp_marca": "23423425245",
-    "app_nome": "ffggdfgdfgdfg",
-    "app_endereco": "dfgdfgdfgdfgdfg",
-    "app_cor_1": "#1E13BE",
-    "app_cor_2": "#238EA9",
-    "app_desc_curta": "...",
-    "app_desc_longa": "...",
+    "site": "marcaexemplo.com.br",
+    "registrador": "Registro.br",
+    "telefone_0800": "08000000000",
+    "whatsapp_marca": "5133330000",
+    "app_nome": "Marca Exemplo",
+    "app_endereco": "Av Exemplo 100, Porto Alegre - RS, 90000-000",
+    "app_cor_1": "#FF6600",
+    "app_cor_2": "#1C19B3",
+    "app_desc_curta": "Bem-vindo ao app da Marca Exemplo, sua operadora digital",
+    "app_desc_longa": "Com o app da Marca Exemplo voce acompanha consumo, faz recargas e fala com o atendimento.",
     "tem_acesso_dominio": true,
-    "logo_url": "https://s3.amazonaws.com/s3-contel-imagens-aplicacao/formulario-marca/75/logo-....png",
-    "logo_nome": "Captura de tela 2026-03-24 115043.png",
+    "logo_url": "https://s3.amazonaws.com/s3-contel-imagens-aplicacao/formulario-marca/13/logo-marca-exemplo.png",
+    "logo_nome": "logo-marca-exemplo.png",
     "manual_url": null,
     "manual_nome": null,
-    "produtos": ["Site Web", "Link de recarga facil", "Notify", "Solucao de Vendas", "Aplicativo Mobile"]
+    "produtos": ["Site Web", "Aplicativo Mobile"]
   }
 }
 ```
@@ -256,13 +288,13 @@ Acesso ao painel onde o domínio foi registrado, **com a senha decifrada**.
 
 ```json
 {
-  "formId": "2",
-  "submittedAt": "2026-08-11T15:57:48.713Z",
+  "formId": "1",
+  "submittedAt": "2026-08-20T16:52:41.867Z",
   "registrar": "Registro.br",
-  "website": "pafer.com.br",
-  "login": "admin@pafer.com.br",
-  "password": "<senha decifrada>",
-  "notes": "Autenticacao em duas etapas ativa"
+  "website": "marcaexemplo.com.br",
+  "login": "admin@marcaexemplo.com.br",
+  "password": "<texto original — nunca colar em ticket, chat ou log>",
+  "notes": "Autenticacao em duas etapas no celular do responsavel"
 }
 ```
 
@@ -276,11 +308,30 @@ Acesso ao painel onde o domínio foi registrado, **com a senha decifrada**.
 | `403` | JWT válido mas o usuário não é admin, ou token sem email |
 | `404` | A marca ainda não enviou o formulário |
 
+> **Manuseio do retorno.** Este é o único endpoint que devolve credencial de terceiro.
+> O `password` não deve ser colado em ticket, chat, e-mail, print ou log — use e
+> descarte. Depois do domínio apontado, chame o `DELETE` da mesma rota para apagar a
+> senha do banco.
+
 ### Auditoria
 
 Grava em `FORMULARIO_MARCA_ACESSO` **antes** de responder — ação `LEITURA`, email, IP e
 data. Se o registro falhar, a leitura falha junto. Tentativa que não encontrou senha
 também é registrada. Detalhes em [07-seguranca.md](07-seguranca.md).
+
+---
+
+### Diferença entre os endpoints 3 e 4
+
+| | `3` — onboarding | `4` — domain-access |
+| --- | --- | --- |
+| Devolve | Tudo que a marca respondeu | Só o acesso ao domínio |
+| Senha e login | **Não** — só `tem_acesso_dominio` | Sim, senha em texto |
+| Quem pode | Qualquer usuário autenticado | Só admin |
+| Fica registrado | Não | **Sim**, sempre |
+
+O endpoint 3 é o dossiê da marca: pode ser chamado à vontade, não expõe credencial.
+O 4 é o cofre: exige admin e cada abertura vira uma linha de auditoria.
 
 ---
 
