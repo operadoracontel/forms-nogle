@@ -19,6 +19,12 @@ do link.
 O que o token dá acesso a: o nome da marca e o formulário em branco. Nada de dados
 financeiros, base de clientes ou qualquer outra tela.
 
+**A emissão do link vive só no ERP, por decisão.** Não existe endpoint no Cartman que
+gere ou liste tokens, e não deve existir: dentro do ERP a ação herda a sessão, a
+whitelist de usuários da tela e a auditoria que já existem. Assim um JWT de admin
+vazado não emite link para marca nenhuma, e nenhum sistema externo cria acesso ao
+formulário. O custo é ter que passar pela tela para gerar — aceito.
+
 ## Trava de duplicidade
 
 Duas camadas:

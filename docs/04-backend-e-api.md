@@ -300,6 +300,62 @@ Zera a senha do domínio depois que ele já foi apontado. Idempotente.
 
 ---
 
+## Os dois tokens — não confundir
+
+| Token | Para quê | Como obter |
+| --- | --- | --- |
+| **Token do link** | Credencial das rotas públicas. Vai no path: `/brand-form/:token` | **Só pelo ERP.** Não existe rota que gere |
+| **JWT** | Credencial das rotas internas. Vai no header `Authorization: Bearer` | `POST /authenticate` ou `POST /comercial/login` |
+
+### Token do link — gerado apenas no ERP, por decisão
+
+O link nasce no botão **GERAR LINK** da tela Detalhes da Marca
+(`detalhes-marca.aspx`): o VB gera 32 bytes de `RNGCryptoServiceProvider` e insere em
+`FORMULARIO_MARCA`. Ver [08-erp-integracao.md](08-erp-integracao.md).
+
+**Não existe — e não deve existir — endpoint no Cartman que crie ou liste tokens.**
+Gerar link é ação privilegiada: mantendo-a dentro do ERP ela herda a sessão, a
+whitelist de usuários e a auditoria que a tela já tem. Um JWT de admin vazado não
+consegue emitir link para marca nenhuma, e nenhum sistema externo cria acesso ao
+formulário.
+
+Consequência aceita: para descobrir o token de uma marca é preciso consultar o banco
+(`FORMULARIO_MARCA`) ou clicar no botão de novo — ele reaproveita o link pendente em
+vez de gerar outro.
+
+### JWT
+
+```bash
+curl -X POST https://cartman.conteltelecom.com.br/authenticate   -H "Content-Type: application/json"   -d '{"email":"seu@email.com","password":"sua-senha"}'
+```
+
+```json
+{ "token": "eyJhbGciOiJIUzI1NiIs...", "id": 16761, "email": "seu@email.com" }
+```
+
+Validade de 8h. `POST /comercial/login` serve para usuários do CRM e assina com o mesmo
+segredo, então o JWT vale igual nas duas origens.
+
+---
+
+## Parâmetros
+
+Nenhuma rota usa query string. Só **path param** e **header**.
+
+| Rota | Path param | Header |
+| --- | --- | --- |
+| GET/POST `/brand-form/:token` | `:token` — 43 caracteres base64url | — |
+| GET `/brand-form/brand/:brandId` | `:brandId` — `id_FRANQUIA_MARCA_PROPRIA`, inteiro | `Authorization: Bearer` |
+| GET/DELETE `.../domain-access` | idem | `Authorization: Bearer` |
+
+`:brandId` é o mesmo id que a tela do ERP usa (`detalhes-marca.aspx?id=75`).
+
+`GET /brand-form/brand/:brandId` responde `200` mesmo quando a marca não tem
+formulário — o que muda é o campo `status` (`CONCLUIDO` / `PENDENTE` / `SEM_LINK`).
+Quem consome não precisa tratar `404` como caso normal.
+
+---
+
 ## Consumindo de fora
 
 A API é consultável por qualquer sistema, não só pelo formulário. Exemplos com a base
