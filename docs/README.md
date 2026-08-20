@@ -10,4 +10,5 @@
 | [06-padrao-visual.md](06-padrao-visual.md) | Tema, tokens, componentes e regras de mobile. |
 | [07-seguranca.md](07-seguranca.md) | Token do link, trava de duplicidade e dados sensíveis. |
 | [08-erp-integracao.md](08-erp-integracao.md) | Botão na tela Detalhes da Marca (sistema-contel). |
+| [sql/PRODUCAO.md](sql/PRODUCAO.md) | **Runbook para subir em produção** — quais scripts rodar, verificação e rollback. |
 | [sql/](sql) | DDL das tabelas e migrações, com bloco de rollback em cada arquivo. |
