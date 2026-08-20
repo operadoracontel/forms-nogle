@@ -1,1 +1,15 @@
+# Unica variavel que o codigo le (src/services/api.jsx).
 REACT_APP_API_URL=http://localhost:3333
+
+# ATENCAO: nao coloque segredo neste arquivo.
+# No Create React App tudo que comeca com REACT_APP_ e embutido no bundle
+# JavaScript entregue ao navegador — qualquer pessoa le com F12. E o que nao
+# tem esse prefixo o CRA simplesmente ignora.
+#
+# Credencial da AWS e id do CloudFront sao secrets do repositorio no GitHub,
+# usados so pelo workflow de deploy. Nunca vao para o .env:
+#   AWS_ACCESS_KEY_ID
+#   AWS_SECRET_ACCESS_KEY
+#   AWS_REGION
+#   S3_BUCKET_NAME
+#   CLOUDFRONT_DISTRIBUTION_ID
