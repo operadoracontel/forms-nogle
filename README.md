@@ -51,6 +51,32 @@ Estados finais que o cliente pode ver: **link inválido**, **link expirado**,
 
 ---
 
+## API
+
+Este repositório é a **referência oficial da API do formulário**. Os endpoints executam
+no Cartman (`cartman.conteltelecom.com.br`); o contrato completo de cada um — payload,
+respostas, códigos de erro e autenticação — está em
+[`docs/04-backend-e-api.md`](./docs/04-backend-e-api.md).
+
+| Método | Rota | Acesso |
+| --- | --- | --- |
+| GET | `/brand-form/:token` | Público |
+| POST | `/brand-form/:token` | Público |
+| GET | `/brand-form/brand/:brandId` | JWT |
+| GET | `/brand-form/brand/:brandId/domain-access` | JWT + admin |
+| DELETE | `/brand-form/brand/:brandId/domain-access` | JWT + admin |
+
+Consultar os dados de uma marca:
+
+```bash
+curl -H "Authorization: Bearer $JWT"   https://cartman.conteltelecom.com.br/brand-form/brand/75
+```
+
+Do lado do front, as chamadas ficam todas em `src/services/api.jsx` — nenhuma tela monta
+URL própria.
+
+---
+
 ## Estrutura
 
 ```

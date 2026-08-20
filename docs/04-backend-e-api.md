@@ -300,6 +300,33 @@ Zera a senha do domínio depois que ele já foi apontado. Idempotente.
 
 ---
 
+## Consumindo de fora
+
+A API é consultável por qualquer sistema, não só pelo formulário. Exemplos com a base
+de produção (`https://cartman.conteltelecom.com.br`):
+
+```bash
+# 1. Estado de um link (público)
+curl https://cartman.conteltelecom.com.br/brand-form/SEU_TOKEN
+
+# 2. Enviar o formulário (público)
+curl -X POST https://cartman.conteltelecom.com.br/brand-form/SEU_TOKEN   -F 'payload={"companyName":"Minha Marca","contactWhatsapp":"51999999999","products":["Site Web"]}'   -F "logo=@logo.png;type=image/png"
+
+# 3. Dados que a marca respondeu (JWT)
+curl -H "Authorization: Bearer $JWT"   https://cartman.conteltelecom.com.br/brand-form/brand/75
+
+# 4. Acesso ao domínio, com a senha (JWT + admin)
+curl -H "Authorization: Bearer $JWT"   https://cartman.conteltelecom.com.br/brand-form/brand/75/domain-access
+
+# 5. Apagar a senha depois do domínio apontado (JWT + admin)
+curl -X DELETE -H "Authorization: Bearer $JWT"   https://cartman.conteltelecom.com.br/brand-form/brand/75/domain-access
+```
+
+O JWT sai de `POST /authenticate` (login do ERP) ou `POST /comercial/login` (login do
+CRM) — ver a seção abaixo.
+
+---
+
 ## Autenticação
 
 As rotas internas usam o middleware `auth` do Cartman: header
