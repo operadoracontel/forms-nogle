@@ -1,0 +1,16 @@
+.form-brand-preview { min-width: 0; overflow-anchor: none; }
+.form-brand-preview__stage { min-width: 0; overscroll-behavior: contain; }
+.form-brand-preview .app-preview--screen { padding: 20px 8px; }
+.form-preview-canvas { position: relative; width: 100%; min-height: 1px; }
+.form-preview-canvas__content { position: absolute; top: 0; transform-origin: top left; }
+.form-app-carousel { border-radius: 20px; background: #f2f4f3; }
+.form-brand-preview .form-app-carousel__arrow { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 40px; min-width: 40px; height: 44px; padding: 0; border-radius: 999px; border: 1px solid #d5d9df; background: #fff; color: #111827; box-shadow: 0 3px 10px #0001; }
+.form-brand-preview .form-app-carousel__arrow:hover { background: #e9edf0; }
+.form-app-carousel__arrow--previous { left: calc(50% - var(--app-carousel-phone-width) / 2 - 52px); }
+.form-app-carousel__arrow--next { right: calc(50% - var(--app-carousel-phone-width) / 2 - 52px); }
+.form-app-carousel__arrow svg { width: 20px; height: 20px; }
+.form-web-carousel { position: relative; min-width: 0; padding-inline: 48px; }
+.form-brand-preview .form-web-carousel__arrow { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 40px; min-width: 40px; height: 44px; padding: 0; border-radius: 999px; }
+.form-web-carousel__arrow--previous { left: 0; }
+.form-web-carousel__arrow--next { right: 0; }
+.form-web-carousel__arrow svg { width: 20px; height: 20px; }

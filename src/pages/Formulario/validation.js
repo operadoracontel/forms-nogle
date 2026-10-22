@@ -1,9 +1,8 @@
-import { onlyDigits, HEX_COLOR, isSameHex } from '../../utils/format';
-import { APP_PRODUCT } from './constants';
+import { onlyDigits, HEX_COLOR } from '../../utils/format';
+import { validateAppAsset } from '../../utils/appAssets';
 
-// Espelha a validação do Cartman (src/middlewares/brandFormMiddleware.js).
-// O backend continua sendo a autoridade — aqui é só para o cliente saber o que
-// falta antes de tentar enviar.
+// Validação local de campos e assets. A API deve revalidar arquivos e dimensões
+// quando o envio for reativado; a validação do cliente não substitui o servidor.
 
 export const LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
 export const MANUAL_MIME_TYPES = [
@@ -21,8 +20,8 @@ const isFilled = (value) => String(value === null || value === undefined ? '' : 
 const validateBasico = (form) => {
     const errors = {};
 
-    if (!isFilled(form.companyName)) {
-        errors.companyName = 'Informe o nome da sua empresa ou marca.';
+    if (!Number.isSafeInteger(form.brandId) || form.brandId <= 0 || !isFilled(form.companyName)) {
+        errors.companyName = 'Selecione sua marca na lista de marcas cadastradas.';
     }
 
     const contact = onlyDigits(form.contactWhatsapp);
@@ -33,14 +32,20 @@ const validateBasico = (form) => {
         errors.contactWhatsapp = 'WhatsApp inválido. Use DDD + número.';
     }
 
-    if (!form.products || form.products.length === 0) {
-        errors.products = 'Selecione ao menos um produto contratado.';
+    const phone = onlyDigits(form.phone0800);
+    if (phone && (phone.length < 10 || phone.length > 11)) {
+        errors.phone0800 = 'Número 0800 inválido.';
+    }
+
+    const brandWhatsapp = onlyDigits(form.brandWhatsapp);
+    if (brandWhatsapp && (brandWhatsapp.length < 10 || brandWhatsapp.length > 13)) {
+        errors.brandWhatsapp = 'WhatsApp inválido. Use DDD + número.';
     }
 
     return errors;
 };
 
-const validateIdentidade = (form) => {
+const validateIdentidade = (form, hasApp = false) => {
     const errors = {};
 
     if (isFilled(form.primaryColor) && !HEX_COLOR.test(String(form.primaryColor).trim())) {
@@ -67,33 +72,15 @@ const validateIdentidade = (form) => {
         }
     }
 
-    return errors;
+    return { ...errors, ...validateApp(form, hasApp) };
 };
 
 const validateDominio = () => ({});
 
-const validateContatos = (form) => {
+const validateApp = (form, hasApp = false) => {
     const errors = {};
 
-    const phone = onlyDigits(form.phone0800);
-
-    if (phone && (phone.length < 10 || phone.length > 11)) {
-        errors.phone0800 = 'Número 0800 inválido.';
-    }
-
-    const brandWhatsapp = onlyDigits(form.brandWhatsapp);
-
-    if (brandWhatsapp && (brandWhatsapp.length < 10 || brandWhatsapp.length > 13)) {
-        errors.brandWhatsapp = 'WhatsApp inválido. Use DDD + número.';
-    }
-
-    return errors;
-};
-
-const validateApp = (form) => {
-    const errors = {};
-
-    if (!form.products?.includes(APP_PRODUCT)) {
+    if (!hasApp || form.appEnabled === false) {
         return errors;
     }
 
@@ -109,12 +96,23 @@ const validateApp = (form) => {
         errors.appColorOne = 'Informe a cor primária do aplicativo em HEX.';
     } else if (!HEX_COLOR.test(String(form.appColorOne).trim())) {
         errors.appColorOne = 'Use o formato HEX (ex: #FF5500).';
-    } else if (isSameHex(form.appColorOne, form.primaryColor)) {
-        errors.appColorOne = 'A cor do app não pode ser a mesma da sua logo — o app fica sem contraste.';
     }
 
-    if (isFilled(form.appColorTwo) && !HEX_COLOR.test(String(form.appColorTwo).trim())) {
+    if (!isFilled(form.appColorTwo)) {
+        errors.appColorTwo = 'Informe a cor de contraste do aplicativo.';
+    } else if (!HEX_COLOR.test(String(form.appColorTwo).trim())) {
         errors.appColorTwo = 'Use o formato HEX (ex: #FF5500).';
+    }
+
+    if (isFilled(form.appIconBackgroundColor) && !HEX_COLOR.test(String(form.appIconBackgroundColor).trim())) {
+        errors.appIconBackgroundColor = 'Use o formato HEX (ex: #FF5500).';
+    }
+    if (form.appCustomSplash && isFilled(form.appSplashColor) && !HEX_COLOR.test(String(form.appSplashColor).trim())) {
+        errors.appSplashColor = 'Use o formato HEX (ex: #FF5500).';
+    }
+    for (const [field, kind] of [['appLogo', 'logo'], ['appLauncherIcon', 'icon'], ...(form.appCustomSplash ? [['appSplashImage', 'splash']] : [])]) {
+        const error = validateAppAsset(form[field], kind);
+        if (error) errors[field] = error;
     }
 
     if (!isFilled(form.appShortDescription)) {
@@ -132,14 +130,12 @@ const VALIDATORS = {
     basico: validateBasico,
     identidade: validateIdentidade,
     dominio: validateDominio,
-    contatos: validateContatos,
-    app: validateApp,
 };
 
-export const validateStep = (stepId, form) => (VALIDATORS[stepId] ? VALIDATORS[stepId](form) : {});
+export const validateStep = (stepId, form, hasApp = false) => (VALIDATORS[stepId] ? VALIDATORS[stepId](form, hasApp) : {});
 
-export const validateAll = (form) =>
+export const validateAll = (form, hasApp = false) =>
     Object.keys(VALIDATORS).reduce(
-        (accumulator, stepId) => ({ ...accumulator, ...VALIDATORS[stepId](form) }),
+        (accumulator, stepId) => ({ ...accumulator, ...VALIDATORS[stepId](form, hasApp) }),
         {}
     );

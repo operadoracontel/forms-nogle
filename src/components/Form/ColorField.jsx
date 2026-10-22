@@ -13,8 +13,8 @@ import { HEX_COLOR, normalizeHex } from '../../utils/format';
 
 // Cor em HEX: seletor nativo + campo de texto. Os dois escrevem o mesmo valor,
 // então quem tem o código da marca digita, e quem não tem escolhe no seletor.
-const ColorField = ({ label, value, onChange, error, helper, isRequired }) => {
-    const swatch = HEX_COLOR.test(String(value || '').trim()) ? value : '#FFFFFF';
+const ColorField = ({ label, value, onChange, error, helper, isRequired, fallbackColor }) => {
+    const swatch = HEX_COLOR.test(String(value || '').trim()) ? value : HEX_COLOR.test(String(fallbackColor || '').trim()) ? fallbackColor : '#FFFFFF';
 
     return (
         <FormControl isInvalid={Boolean(error)} isRequired={isRequired}>
@@ -40,7 +40,7 @@ const ColorField = ({ label, value, onChange, error, helper, isRequired }) => {
                     value={value || ''}
                     onChange={(event) => onChange(event.target.value)}
                     onBlur={(event) => onChange(normalizeHex(event.target.value))}
-                    placeholder="#02EA75"
+                    placeholder={fallbackColor || '#02EA75'}
                     maxLength={7}
                     fontSize={{ base: '16px', md: 'sm' }}
                 />

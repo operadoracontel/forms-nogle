@@ -3,7 +3,7 @@ import { Badge, Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 
 // Card de seção do formulário. `highlight` liga o destaque neon usado na seção de
 // domínio (NOGLE-27602 pede prioridade visual nessa etapa).
-const SectionCard = ({ icon, title, description, badge, highlight, children }) => (
+const SectionCard = ({ icon, title, description, badge, highlight, headerAction, children }) => (
     <Box
         bg="surface"
         border="1px solid"
@@ -14,7 +14,7 @@ const SectionCard = ({ icon, title, description, badge, highlight, children }) =
     >
         <Stack spacing={{ base: 4, md: 5 }}>
             <Stack spacing={2}>
-                <HStack spacing={3} align="center">
+                <HStack spacing={3} align="center" flexWrap="wrap">
                     {icon && (
                         <Box
                             bg="secondarySubtle"
@@ -38,6 +38,7 @@ const SectionCard = ({ icon, title, description, badge, highlight, children }) =
                             {badge}
                         </Badge>
                     )}
+                    {headerAction && <Box ml="auto">{headerAction}</Box>}
                 </HStack>
 
                 {description && (

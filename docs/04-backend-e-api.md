@@ -6,6 +6,26 @@ O backend é a API **Cartman** (repositório `cartman`, Node 22 + MVC), apontada
 Este documento é a **referência completa dos endpoints do formulário**. Toda a
 documentação de API do NOGLE-27602 vive aqui, não espalhada pelos outros repositórios.
 
+**Estado local em 22/10/2026:** o novo GET público fornece contexto derivado do ERP,
+sem gravações. O cliente exige esse contrato e respeita `submissionAvailable: false`.
+Os demais endpoints `/brand-form`, upload S3, criptografia e persistência descritos
+adiante são o contrato histórico, ainda não restaurado neste checkout. Não foram criadas tabelas nem
+emitidos tokens. Tabelas ausentes geram indisponibilidade explícita, sem fallback
+para demonstração. A demonstração é exclusiva de `/demo` e nunca envia dados.
+
+Para desenvolvimento local somente de leitura, o Cartman inclui
+`scripts/forms-preview-server.cjs`. Em `C:\Sites\cartman`, execute
+`$env:FORMS_PREVIEW_PORT='3335'; node scripts/forms-preview-server.cjs` no PowerShell.
+Ele escuta em `127.0.0.1:3335`, importa apenas os controllers reais das duas rotas
+GET públicas do Forms e não carrega os inicializadores de banco do aplicativo
+completo. Iniciar o script não consulta o ERP; apenas chamar as rotas faz leituras.
+O limite HTTP por rota é de 30 segundos, com `502 ERP_UNAVAILABLE` genérico; as
+queries mantêm cancelamento após 15 segundos. No processo de desenvolvimento do
+Forms, use `REACT_APP_API_URL=http://127.0.0.1:3335`. Não há POST nesse servidor.
+Se o Forms já usar a porta `3333`, o Cartman completo estiver parado e essa porta
+estiver livre, execute o helper com `$env:FORMS_PREVIEW_PORT='3333'` para preservar
+a configuração do frontend, sem alterar `.env` ou o cliente HTTP.
+
 > **Todos os exemplos usam dados fictícios** (`Marca Exemplo`, `51999990000`,
 > `marcaexemplo.com.br`). Nenhum retorno real de cliente entra nesta documentação:
 > nome de marca, telefone, site e login são dados de terceiros. A senha do domínio
@@ -18,6 +38,7 @@ neste repositório, em `src/services/api.jsx` — nenhuma tela monta URL própri
 
 | Rota | Função cliente (`src/services/api.jsx`) |
 | --- | --- |
+| GET `/brand-form/catalog/brands` | `getBrandCatalog(options)` — catálogo público reduzido |
 | GET `/brand-form/:token` | `getBrandForm(token)` |
 | POST `/brand-form/:token` | `submitBrandForm(token, formData)` |
 | GET `/brand-form/brand/:brandId` | `getBrandOnboarding(brandId)` |
@@ -48,6 +69,7 @@ Arquivos no Cartman:
 
 | Método | Rota | Acesso |
 | --- | --- | --- |
+| GET | `/brand-form/catalog/brands` | **Público**, somente IDs e nomes |
 | GET | `/brand-form/:token` | **Público** |
 | POST | `/brand-form/:token` | **Público** |
 | GET | `/brand-form/brand/:brandId` | `auth` (JWT) |
@@ -57,10 +79,27 @@ Arquivos no Cartman:
 `:token` é o token opaco do link, gerado no ERP.
 `:brandId` é o `id_FRANQUIA_MARCA_PROPRIA`.
 
-As duas primeiras são públicas **de propósito**: quem acessa é o cliente da marca, que
-não tem usuário no ERP. O token é a única credencial e vale um envio só.
+As rotas de contexto/envio por token são públicas **de propósito**: quem acessa é o
+cliente da marca, que não tem usuário no ERP. O token é a única credencial do
+formulário e vale um envio só. O catálogo reduzido abaixo é público para permitir
+buscar e selecionar um nome existente, sem criar ou renomear marcas.
 
 ---
+
+## Catálogo público de marcas
+
+`GET /brand-form/catalog/brands` responde com `{ "brands": [{ "id": 75,
+"name": "Marca Exemplo" }] }`. Lista todas as marcas com ID positivo e nome não
+vazio de `FRANQUIA_MARCA_PROPRIA`, em ordem de nome e ID. A resposta contém somente
+essas duas propriedades por marca: não inclui produtos, preços, contatos,
+credenciais ou tokens. A consulta não depende das tabelas do formulário.
+
+A rota usa `Cache-Control: no-store`, cancela a consulta após 15 segundos e retorna
+`502` com `reason: ERP_UNAVAILABLE` e mensagem genérica quando a leitura falha.
+O seletor apenas utiliza nomes existentes; digitar um nome não cria uma marca.
+No formulário real, o ID selecionado precisa coincidir com a marca vinculada ao
+token. Na demonstração, qualquer marca do catálogo pode ser visualizada, sem envio.
+Selecionar outra marca nunca altera o vínculo, os produtos ou o `hasApp` do token.
 
 ## 1. GET `/brand-form/:token`
 
@@ -71,14 +110,42 @@ ao abrir. **Sem autenticação.**
 
 ```json
 {
+  "brandId": 75,
   "brandName": "Marca Exemplo",
-  "products": ["Site Web", "Aplicativo Mobile", "Link de recarga facil", "Solucao de Vendas", "Notify"],
-  "expiresAt": null
+  "expiresAt": null,
+  "productsSource": "erp",
+  "hasApp": true,
+  "contractedProducts": ["Site Web", "Aplicativo Mobile"],
+  "submissionAvailable": false
 }
 ```
 
-`brandName` já vem preenchido no primeiro campo do formulário. `expiresAt` nulo
-significa link sem prazo.
+`brandName` já vem preenchido no primeiro campo do formulário. `brandId` é o
+`id_FRANQUIA_MARCA_PROPRIA` da única marca vinculada ao token, como número inteiro
+positivo e seguro em JSON. O cliente aceita o campo ausente ou nulo em versões
+anteriores, normalizando-o para `null`; na demonstração ele também é `null`.
+O ID identifica a marca do link; o catálogo público reduzido não autoriza trocar
+esse vínculo. O cliente pode ler respostas antigas sem ID, mas não montar um envio
+real enquanto o contexto não fornecer um ID válido e a seleção correspondente.
+`expiresAt` nulo significa link sem prazo.
+
+O corpo é direto em `response.data`, sem wrapper `success/data`. `hasApp` e
+`submissionAvailable` precisam ser booleanos; `productsSource` deve ser `erp`.
+`contractedProducts` contém somente nomes canônicos: `Site Web`, `Aplicativo Mobile`,
+`Link de recarga facil`, `Solucao de Vendas` e `Notify`. Categorias repetidas são
+deduplicadas; lista vazia é válida quando não há categoria reconhecida no ERP.
+`hasApp` deve coincidir com a presença de `Aplicativo Mobile` nessa lista.
+
+O App usa exclusivamente o indicador `status_possui_aplicativo` do ERP. As outras
+categorias vêm dos vínculos ativos e dos aliases documentados das soluções. A lista
+legada `products` de opções disponíveis não serve como seleção contratada. Metadata
+ausente ou incoerente exibe erro com retry. O cliente não permite escolher produtos.
+
+Com `submissionAvailable: false`, o botão de enviar fica desabilitado; não há POST
+nem sucesso simulado. No futuro, o POST deverá consultar novamente o ERP pelo token,
+derivar seus próprios produtos e validar os campos App pelo `hasApp` atual, sem
+confiar em uma seleção ou no `brandId` enviado pelo cliente. O vínculo de marca
+sempre é resolvido pelo token. Isso não exige nova coluna no banco.
 
 ### Erros
 
@@ -89,6 +156,8 @@ significa link sem prazo.
 | `410` | `EXPIRED` | `dtExpiracao_FORMULARIO_MARCA` no passado (30 dias por padrão) |
 | `429` | — | Mais de 60 leituras do mesmo IP em 10 minutos; vem `Retry-After` |
 | `500` | — | Erro interno (mensagem genérica; detalhe só no log) |
+| `502` | `ERP_UNAVAILABLE` | Falha ou timeout ao consultar o ERP |
+| `503` | `FORMULARIO_INDISPONIVEL` | Integração/tabelas indisponíveis neste ambiente |
 
 Exemplos de cada desfecho:
 
@@ -123,7 +192,7 @@ a marca respondeu — nem em `409`, quando o formulário já existe. Quem consul
 
 ---
 
-## 2. POST `/brand-form/:token`
+## 2. POST `/brand-form/:token` — contrato histórico, indisponível localmente
 
 Grava a resposta e fecha o link. `multipart/form-data`. **Sem autenticação.**
 
@@ -134,9 +203,16 @@ Grava a resposta e fecha o link. `multipart/form-data`. **Sem autenticação.**
 | `payload` | string (JSON) | sim | Ver tabela abaixo |
 | `logo` | arquivo | não | PNG, JPG ou PDF. Máx **20MB** |
 | `brandManual` | arquivo | não | PDF, PNG, JPG ou ZIP. Máx **20MB** |
+| `appLogo` | arquivo | não | Novo contrato do cliente: PNG, SVG ou JPG; até 20MB; somente com App. |
+| `appLauncherIcon` | arquivo | não | Novo contrato do cliente: PNG 512×512; até 20MB; somente com App. |
+| `appSplashImage` | arquivo | não | Novo contrato do cliente: PNG/JPG; até 20MB; somente com App e splash personalizada ativa. |
 
-Limites aplicados no multer, antes de bufferizar em memória: 2 arquivos, 10 campos,
-256KB por campo de texto, 20MB por arquivo.
+O contrato histórico previa no multer 2 arquivos, 10 campos, 256KB por campo de
+texto e 20MB por arquivo. Os novos assets estão preparados no cliente; ainda não
+existe persistência local nem endpoint POST ativo. Ao implementar o envio, o
+servidor deverá aceitar até 5 arquivos, revalidar conteúdo, tamanho e dimensões
+512×512 do ícone, tratar SVG com segurança e derivar `hasApp` pelo token. A checagem
+do navegador não substitui essas validações. Não houve alteração de tabelas.
 
 O conteúdo do arquivo é conferido por **magic bytes**, não só pelo `Content-Type`
 declarado: PNG, JPG e PDF no logo; PNG, JPG, PDF e ZIP no manual.
@@ -145,9 +221,11 @@ declarado: PNG, JPG e PDF no logo; PNG, JPG, PDF e ZIP no manual.
 
 | Chave | Obrigatória | Validação |
 | --- | --- | --- |
-| `companyName` | **sim** | Não vazio |
+| `brandId` | automático | Inteiro positivo do contexto ERP; a seleção precisa coincidir. Contexto sem ID bloqueia o envio. O futuro servidor resolve a marca pelo token e não confia nesse ID. |
+| `companyName` | automático | Nome canônico do contexto ERP. O cliente ignora qualquer nome livre no estado editável. |
 | `contactWhatsapp` | **sim** | 10 a 13 dígitos |
-| `products` | **sim** | Array, ao menos 1, valores de `AVAILABLE_PRODUCTS` |
+| `products` | automático | Cópia de `contractedProducts` do contexto ERP; pode ser vazio quando essa é a classificação real. O futuro servidor recalcula pelo token. |
+| `productsSource` | automático | `erp`; marcador de contrato, sem substituir a consulta no servidor. |
 | `primaryColor` / `secondaryColor` | não | HEX (`#RGB` ou `#RRGGBB`) |
 | `website` | não | Texto livre, até 300 |
 | `domainRegistrar` | não | Até 200 |
@@ -157,13 +235,21 @@ declarado: PNG, JPG e PDF no logo; PNG, JPG, PDF e ZIP no manual.
 | `phone0800` | não | 10 ou 11 dígitos |
 | `brandWhatsapp` | não | 10 a 13 dígitos |
 | `appName` | condicional¹ | Até 200 |
+| `appEnabled` | automático com App no ERP | Booleano; padrão `false`. Ativado explicitamente pelo cliente; `false` suspende campos e anexos do App sem alterar os produtos contratados. |
 | `appAddress` | condicional¹ | Até 400 |
 | `appColorOne` | condicional¹ | HEX |
-| `appColorTwo` | não | HEX |
+| `appColorTwo` | condicional¹ | HEX; cor de contraste, padrão `#FFFFFF`. |
+| `appIconBackgroundColor` | automático com App | HEX; vazio no formulário usa `appColorOne`. |
+| `appCustomSplash` | automático com App | Booleano. |
+| `appSplashColor` | com splash personalizada | HEX; vazio usa `appColorOne`; `null` se desativada. |
 | `appShortDescription` | condicional¹ | Até 400 |
 | `appLongDescription` | condicional¹ | Texto longo |
 
-¹ Obrigatórios **apenas** quando `products` inclui `"Aplicativo Mobile"`.
+¹ Obrigatórios **apenas** quando `hasApp` do contexto ERP e `appEnabled` são
+`true`. Sem contratação ERP, o cliente omite todos os campos e arquivos App.
+Com contratação e `appEnabled: false`, só esse indicador é enviado; os demais
+campos e anexos do App ficam de fora, mesmo com valores antigos no estado.
+Desligar a splash omite sua imagem e envia `appSplashColor: null`.
 
 > **Atenção aos valores de `products`:** trafegam **sem acento**, porque o padrão do
 > Cartman proíbe acento em string — `"Link de recarga facil"`, `"Solucao de Vendas"`.

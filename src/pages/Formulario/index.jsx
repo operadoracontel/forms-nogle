@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     Alert,
@@ -27,10 +27,9 @@ import Sucesso from '../Status/Sucesso';
 import StepBasico from './steps/StepBasico';
 import StepIdentidade from './steps/StepIdentidade';
 import StepDominio from './steps/StepDominio';
-import StepContatos from './steps/StepContatos';
-import StepApp from './steps/StepApp';
 
-import { APP_PRODUCT, INITIAL_FORM, STEPS } from './constants';
+import { INITIAL_FORM, STEPS } from './constants';
+import { buildSubmissionFormData, demoBrandFormContext, parseBrandFormContext } from './context';
 import { validateStep, validateAll } from './validation';
 import { getBrandForm, submitBrandForm, extractErrors, extractReason } from '../../services/api';
 
@@ -38,8 +37,6 @@ const STEP_COMPONENTS = {
     basico: StepBasico,
     identidade: StepIdentidade,
     dominio: StepDominio,
-    contatos: StepContatos,
-    app: StepApp,
 };
 
 const FormularioPage = () => {
@@ -50,43 +47,75 @@ const FormularioPage = () => {
     const [blockedReason, setBlockedReason] = useState(null);
     const [submittedAt, setSubmittedAt] = useState(null);
     const [brandName, setBrandName] = useState('');
+    const [context, setContext] = useState(null);
+    const [loadedToken, setLoadedToken] = useState(token);
+    const [attempt, setAttempt] = useState(0);
+    const requestVersion = useRef(0);
+    const submissionController = useRef(null);
 
     const [form, setForm] = useState(INITIAL_FORM);
     const [errors, setErrors] = useState({});
     const [stepIndex, setStepIndex] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Etapa do app só entra no fluxo quando o produto foi contratado.
-    const steps = useMemo(
-        () => STEPS.filter((step) => step.id !== 'app' || form.products.includes(APP_PRODUCT)),
-        [form.products]
-    );
+    const hasApp = context?.hasApp === true;
+    const canSubmit = context?.submissionAvailable === true && token !== 'demo'
+        && Number.isSafeInteger(context?.brandId) && context.brandId > 0;
+    const steps = STEPS;
 
     const currentStep = steps[Math.min(stepIndex, steps.length - 1)];
     const isLastStep = stepIndex >= steps.length - 1;
 
     useEffect(() => {
         let active = true;
+        const controller = new AbortController();
+        requestVersion.current += 1;
+        setLoadedToken(token);
+        setPageState('loading');
+        setBlockedReason(null);
+        setSubmittedAt(null);
+        setBrandName('');
+        setContext(null);
+        setForm({ ...INITIAL_FORM });
+        setErrors({});
+        setStepIndex(0);
+        setIsSubmitting(false);
 
         const loadForm = async () => {
+            if (!token) {
+                setBlockedReason('NOT_FOUND');
+                setPageState('blocked');
+                return;
+            }
+            if (token === 'demo') {
+                const demo = demoBrandFormContext();
+                setContext(demo);
+                setBrandName(demo.brandName);
+                setForm({ ...INITIAL_FORM, companyName: demo.brandName });
+                setPageState('ready');
+                return;
+            }
+
             try {
-                const response = await getBrandForm(token);
-
-                if (!active) {
-                    return;
-                }
-
-                setBrandName(response.data.brandName || '');
-                setForm((previous) => ({ ...previous, companyName: response.data.brandName || '' }));
+                const response = await getBrandForm(token, { signal: controller.signal });
+                if (!active) return;
+                const metadata = parseBrandFormContext(response.data);
+                setContext(metadata);
+                setBrandName(metadata.brandName);
+                setForm({ ...INITIAL_FORM, brandId: metadata.brandId, companyName: metadata.brandName });
                 setPageState('ready');
             } catch (error) {
-                if (!active) {
-                    return;
+                if (!active || controller.signal.aborted) return;
+                // Só o motivo explícito da API prova que o link está bloqueado.
+                // Uma rota ausente (404 sem reason) continua sendo indisponibilidade.
+                const reason = error?.response?.data?.reason;
+                if (['NOT_FOUND', 'ALREADY_SUBMITTED', 'EXPIRED'].includes(reason)) {
+                    setBlockedReason(reason);
+                    setSubmittedAt(error?.response?.data?.submittedAt || null);
+                    setPageState('blocked');
+                } else {
+                    setPageState('error');
                 }
-
-                setBlockedReason(extractReason(error));
-                setSubmittedAt(error?.response?.data?.submittedAt || null);
-                setPageState('blocked');
             }
         };
 
@@ -94,8 +123,10 @@ const FormularioPage = () => {
 
         return () => {
             active = false;
+            controller.abort();
+            submissionController.current?.abort();
         };
-    }, [token]);
+    }, [token, attempt]);
 
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -104,6 +135,9 @@ const FormularioPage = () => {
     const setField = useCallback((field, value) => {
         setForm((previous) => ({ ...previous, [field]: value }));
         setErrors((previous) => {
+            if (field === 'appEnabled' && value === false) {
+                return Object.fromEntries(Object.entries(previous).filter(([key]) => !key.startsWith('app')));
+            }
             if (!previous[field]) {
                 return previous;
             }
@@ -114,43 +148,22 @@ const FormularioPage = () => {
         });
     }, []);
 
-    const buildFormData = () => {
-        const payload = {
-            companyName: form.companyName,
-            contactWhatsapp: form.contactWhatsapp,
-            products: form.products,
-            primaryColor: form.primaryColor,
-            secondaryColor: form.secondaryColor,
-            website: form.website,
-            domainRegistrar: form.domainRegistrar,
-            domainLogin: form.domainLogin,
-            domainPassword: form.domainPassword,
-            domainNotes: form.domainNotes,
-            phone0800: form.phone0800,
-            brandWhatsapp: form.brandWhatsapp,
-        };
+    const setBrand = useCallback((brand) => {
+        setForm((previous) => ({ ...previous, brandId: brand?.id ?? null, companyName: brand?.name || '' }));
+        setErrors((previous) => {
+            const next = { ...previous };
+            delete next.companyName;
+            return next;
+        });
+    }, []);
 
-        if (form.products.includes(APP_PRODUCT)) {
-            payload.appName = form.appName;
-            payload.appAddress = form.appAddress;
-            payload.appColorOne = form.appColorOne;
-            payload.appColorTwo = form.appColorTwo;
-            payload.appShortDescription = form.appShortDescription;
-            payload.appLongDescription = form.appLongDescription;
+    const brandLinkError = () => {
+        if (token === 'demo') return null;
+        if (!Number.isSafeInteger(context?.brandId) || context.brandId <= 0) {
+            return 'Não foi possível identificar a marca deste link. Reabra o formulário.';
         }
-
-        const formData = new FormData();
-        formData.append('payload', JSON.stringify(payload));
-
-        if (form.logo) {
-            formData.append('logo', form.logo);
-        }
-
-        if (form.brandManual) {
-            formData.append('brandManual', form.brandManual);
-        }
-
-        return formData;
+        return form.brandId !== context.brandId
+            ? `Este link pertence à marca ${context.brandName}. Selecione essa marca na lista.` : null;
     };
 
     const showValidationToast = (count) => {
@@ -165,7 +178,11 @@ const FormularioPage = () => {
     };
 
     const handleNext = () => {
-        const stepErrors = validateStep(currentStep.id, form);
+        const stepErrors = validateStep(currentStep.id, form, hasApp);
+        if (currentStep.id === 'basico' && !stepErrors.companyName) {
+            const linkError = brandLinkError();
+            if (linkError) stepErrors.companyName = linkError;
+        }
 
         if (Object.keys(stepErrors).length > 0) {
             setErrors(stepErrors);
@@ -183,15 +200,19 @@ const FormularioPage = () => {
     };
 
     const handleSubmit = async () => {
-        const allErrors = validateAll(form);
+        if (!canSubmit || loadedToken !== token || !token || isSubmitting) return;
+        const version = requestVersion.current;
+        const allErrors = validateAll(form, hasApp);
+        const linkError = brandLinkError();
+        if (linkError) allErrors.companyName = linkError;
 
         if (Object.keys(allErrors).length > 0) {
             setErrors(allErrors);
             showValidationToast(Object.keys(allErrors).length);
 
             // Leva o cliente para a primeira etapa que ainda tem pendência.
-            const firstInvalid = steps.findIndex(
-                (step) => Object.keys(validateStep(step.id, form)).length > 0
+            const firstInvalid = linkError ? 0 : steps.findIndex(
+                (step) => Object.keys(validateStep(step.id, form, hasApp)).length > 0
             );
 
             if (firstInvalid >= 0) {
@@ -202,11 +223,15 @@ const FormularioPage = () => {
         }
 
         setIsSubmitting(true);
+        const controller = new AbortController();
+        submissionController.current = controller;
 
         try {
-            await submitBrandForm(token, buildFormData());
+            await submitBrandForm(token, buildSubmissionFormData(form, context), { signal: controller.signal });
+            if (version !== requestVersion.current || controller.signal.aborted) return;
             setPageState('success');
         } catch (error) {
+            if (version !== requestVersion.current || controller.signal.aborted) return;
             const reason = extractReason(error);
 
             if (reason === 'ALREADY_SUBMITTED' || reason === 'EXPIRED' || reason === 'NOT_FOUND') {
@@ -231,11 +256,11 @@ const FormularioPage = () => {
                 position: 'top',
             });
         } finally {
-            setIsSubmitting(false);
+            if (version === requestVersion.current) setIsSubmitting(false);
         }
     };
 
-    if (pageState === 'loading') {
+    if (loadedToken !== token || pageState === 'loading') {
         return (
             <PageShell>
                 <Center py={20}>
@@ -248,6 +273,14 @@ const FormularioPage = () => {
                 </Center>
             </PageShell>
         );
+    }
+
+    if (pageState === 'error') {
+        return <PageShell><Center py={16}><Stack spacing={4} align="center" textAlign="center" maxW="420px">
+            <Text fontSize="xl" fontWeight={800} color="textPrimary">Formulário indisponível</Text>
+            <Text fontSize="sm" color="textSecondary">Não foi possível carregar seu formulário. Tente novamente mais tarde.</Text>
+            <Button onClick={() => setAttempt((value) => value + 1)}>Tentar novamente</Button>
+        </Stack></Center></PageShell>;
     }
 
     if (pageState === 'blocked') {
@@ -275,7 +308,7 @@ const FormularioPage = () => {
                 <Stack spacing={3}>
                     <Flex justify="space-between" align="baseline" gap={3}>
                         <Text fontSize={{ base: 'xl', md: '2xl' }} fontWeight={800} color="textPrimary">
-                            {brandName || 'Onboarding da sua marca'}
+                            {(token === 'demo' && form.brandId ? form.companyName : brandName) || 'Onboarding da sua marca'}
                         </Text>
                         <Text fontSize="xs" color="textMuted" whiteSpace="nowrap">
                             Etapa {stepIndex + 1} de {steps.length}
@@ -294,6 +327,8 @@ const FormularioPage = () => {
                     </Text>
                 </Stack>
 
+                {!canSubmit && token !== 'demo' && <Alert status="warning" borderRadius="lg" fontSize="sm"><AlertIcon />O envio está temporariamente indisponível. Tente novamente mais tarde.</Alert>}
+
                 {errorCount > 0 && (
                     <Alert status="error" borderRadius="lg" fontSize="sm">
                         <AlertIcon />
@@ -303,7 +338,8 @@ const FormularioPage = () => {
                     </Alert>
                 )}
 
-                <StepComponent form={form} errors={errors} setField={setField} />
+                <StepComponent form={form} errors={errors} setField={setField} setBrand={setBrand}
+                    contractedProducts={context?.contractedProducts || []} hasApp={hasApp} isDemo={token === 'demo'} />
 
                 <Box
                     position={{ base: 'fixed', md: 'static' }}
@@ -333,6 +369,7 @@ const FormularioPage = () => {
                                 rightIcon={<FaPaperPlane />}
                                 onClick={handleSubmit}
                                 isLoading={isSubmitting}
+                                isDisabled={!canSubmit || isSubmitting}
                                 loadingText="Enviando..."
                                 flex="1"
                             >

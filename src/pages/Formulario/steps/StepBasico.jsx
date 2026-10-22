@@ -1,13 +1,13 @@
 import React from 'react';
-import { Box, Stack, Text } from '@chakra-ui/react';
+import { Box, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import { FaRegBuilding } from 'react-icons/fa';
 
 import SectionCard from '../../../components/Form/SectionCard';
 import TextField from '../../../components/Form/TextField';
-import ProductPicker from '../../../components/Form/ProductPicker';
-import { maskPhone } from '../../../utils/format';
+import BrandCombobox from '../../../components/Form/BrandCombobox';
+import { mask0800, maskPhone } from '../../../utils/format';
 
-const StepBasico = ({ form, errors, setField }) => (
+const StepBasico = ({ form, errors, setField, setBrand }) => (
     <Stack spacing={{ base: 4, md: 6 }}>
         <Box
             bg="secondarySubtle"
@@ -27,16 +27,12 @@ const StepBasico = ({ form, errors, setField }) => (
         <SectionCard
             icon={FaRegBuilding}
             title="Informações básicas"
-            description="Comece pelos dados de contato e pelo que você contratou com a gente."
+            description="Informe sua marca, os dados do responsável e os canais de atendimento da empresa."
         >
-            <TextField
-                label="Qual é o nome da sua empresa / marca?"
-                value={form.companyName}
-                onChange={(value) => setField('companyName', value)}
+            <BrandCombobox
+                value={form.brandId ? { id: form.brandId, name: form.companyName } : null}
+                onChange={setBrand}
                 error={errors.companyName}
-                placeholder="Ex: Minha Operadora"
-                maxLength={200}
-                isRequired
             />
 
             <TextField
@@ -50,11 +46,28 @@ const StepBasico = ({ form, errors, setField }) => (
                 isRequired
             />
 
-            <ProductPicker
-                value={form.products}
-                onChange={(value) => setField('products', value)}
-                error={errors.products}
-            />
+            <Box>
+                <Text fontSize="sm" fontWeight={700} color="textPrimary">Contatos extras</Text>
+                <Text fontSize="sm" mt={1} color="textSecondary">Esses números aparecem para os seus clientes nos canais de atendimento da marca.</Text>
+            </Box>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={{ base: 4, md: 5 }}>
+                <TextField
+                    label="Qual é o número 0800 da empresa?"
+                    value={form.phone0800}
+                    onChange={(value) => setField('phone0800', mask0800(value))}
+                    error={errors.phone0800}
+                    placeholder="0800 123 4567"
+                    inputMode="tel"
+                />
+                <TextField
+                    label="Qual é o número de WhatsApp da marca?"
+                    value={form.brandWhatsapp}
+                    onChange={(value) => setField('brandWhatsapp', maskPhone(value))}
+                    error={errors.brandWhatsapp}
+                    placeholder="(51) 99999-9999"
+                    inputMode="tel"
+                />
+            </SimpleGrid>
         </SectionCard>
     </Stack>
 );

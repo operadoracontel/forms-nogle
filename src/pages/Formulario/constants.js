@@ -1,70 +1,44 @@
-import {
-    FaGlobe,
-    FaMobileAlt,
-    FaBolt,
-    FaShoppingCart,
-    FaBell,
-} from 'react-icons/fa';
-
-// `value` é o que trafega para a API — precisa bater exatamente com a lista
-// AVAILABLE_PRODUCTS do Cartman (src/modules/brandFormModule.js), que por padrão
-// do projeto não usa acentos. `label` é só apresentação.
+// Valores canônicos do contrato: recebidos do ERP, nunca escolhidos no formulário.
 export const APP_PRODUCT = 'Aplicativo Mobile';
-
-export const PRODUCTS = [
-    {
-        value: 'Site Web',
-        label: 'Site Web',
-        description: 'Site institucional e de vendas da sua marca.',
-        icon: FaGlobe,
-    },
-    {
-        value: APP_PRODUCT,
-        label: 'Aplicativo Mobile',
-        description: 'App white label publicado nas lojas com a sua marca.',
-        icon: FaMobileAlt,
-    },
-    {
-        value: 'Link de recarga facil',
-        label: 'Link de recarga fácil',
-        description: 'Link direto para o cliente recarregar em poucos toques.',
-        icon: FaBolt,
-    },
-    {
-        value: 'Solucao de Vendas',
-        label: 'Solução de Vendas',
-        description: 'Estrutura completa de vendas e ativação.',
-        icon: FaShoppingCart,
-    },
-    {
-        value: 'Notify',
-        label: 'Notify',
-        description: 'Disparo de notificações e campanhas para a sua base.',
-        icon: FaBell,
-    },
-];
+export const PRODUCT_VALUES = ['Site Web', APP_PRODUCT, 'Link de recarga facil', 'Solucao de Vendas', 'Notify'];
 
 export const WHATSAPP_NOGLE = 'https://wa.me/5551997079001';
 
-export const APP_LONG_DESCRIPTION_TEMPLATE = `Com o app [Nome da sua Marca], você tem tudo o que precisa na palma da mão.
+export const APP_SHORT_DESCRIPTION_TEMPLATE = 'Bem-vindo ao aplicativo da [Nome da sua Marca], a sua operadora de telefonia móvel digital que simplifica a sua vida!';
 
-Controle Total: acompanhe o consumo de internet, minutos e SMS em tempo real.
-Recargas: recarregue o seu número ou o de quem você quiser em poucos segundos.
-Gestão: contrate, troque de plano e acompanhe as suas faturas sem sair do app.
-Atendimento: fale com a nossa equipe direto pelo aplicativo, quando precisar.`;
+export const APP_LONG_DESCRIPTION_TEMPLATE = `Bem-vindo ao aplicativo da [Nome da sua Marca], a sua operadora de telefonia móvel digital que simplifica a sua vida!
+
+Com o app [Nome da sua Marca], você tem tudo o que precisa na palma da mão:
+
+Controle Total: Acompanhe seus planos, saldos e consumo de dados em tempo real.
+
+Recargas e Pagamentos: Recarregue e efetue pagamentos de forma prática e rápida diretamente no app.
+
+Gestão Simplificada: Alterne planos, contrate pacotes extras e resolva tudo sem burocracia.
+
+Atendimento Facilitado: Conte com suporte personalizado sempre que precisar, de forma simples e eficiente.
+
+Aqui, você tem liberdade, praticidade e zero complicações. Baixe agora e descubra como é fácil gerenciar sua linha com a [Nome da sua Marca]! 🚀`;
+
+export const getAppDescriptionDefaults = (brandName) => {
+    const name = brandName?.trim() || '[Nome da sua Marca]';
+    const personalize = (template) => template.split('[Nome da sua Marca]').join(name);
+    return {
+        appShortDescription: personalize(APP_SHORT_DESCRIPTION_TEMPLATE),
+        appLongDescription: personalize(APP_LONG_DESCRIPTION_TEMPLATE),
+    };
+};
 
 export const STEPS = [
     { id: 'basico', title: 'Informações básicas' },
     { id: 'identidade', title: 'Identidade visual' },
     { id: 'dominio', title: 'Domínio e acesso' },
-    { id: 'contatos', title: 'Contatos extras' },
-    { id: 'app', title: 'Aplicativo white label' },
 ];
 
 export const INITIAL_FORM = {
+    brandId: null,
     companyName: '',
     contactWhatsapp: '',
-    products: [],
     primaryColor: '',
     secondaryColor: '',
     logo: null,
@@ -77,9 +51,16 @@ export const INITIAL_FORM = {
     phone0800: '',
     brandWhatsapp: '',
     appName: '',
+    appEnabled: false,
     appAddress: '',
     appColorOne: '',
-    appColorTwo: '',
+    appColorTwo: '#FFFFFF',
+    appIconBackgroundColor: '',
+    appCustomSplash: false,
+    appSplashColor: '',
+    appLogo: null,
+    appLauncherIcon: null,
+    appSplashImage: null,
     appShortDescription: '',
     appLongDescription: '',
 };

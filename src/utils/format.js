@@ -48,23 +48,6 @@ export const normalizeHex = (value) => {
     return withHash.toUpperCase();
 };
 
-export const isSameHex = (a, b) => {
-    const expand = (hex) => {
-        const clean = String(hex || '').replace('#', '').toUpperCase();
-
-        if (clean.length === 3) {
-            return clean.split('').map((char) => char + char).join('');
-        }
-
-        return clean;
-    };
-
-    const first = expand(a);
-    const second = expand(b);
-
-    return first !== '' && first === second;
-};
-
 export const formatFileSize = (bytes) => {
     if (!bytes) {
         return '';

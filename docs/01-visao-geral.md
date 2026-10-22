@@ -33,12 +33,18 @@ Formulário público, sem tela de login, acessado por link único gerado dentro 
 2. **Cliente** — abre `https://formulario.nogle.tech/<token>`. O front chama
    `GET /brand-form/:token`; o Cartman valida o token e devolve o nome da marca
    (que já vem preenchido no primeiro campo).
-3. **Preenchimento** — cinco etapas, sendo a última (aplicativo white label)
-   condicional à seleção do produto *Aplicativo Mobile*.
+3. **Preenchimento** — três etapas. A tela Identidade visual inclui o bloco de
+   aplicativo white label depois das prévias, somente quando o cadastro ERP
+   confirma `hasApp: true`. Não há seleção de produtos.
 4. **Envio** — `POST /brand-form/:token` em `multipart/form-data`: os campos vão no
    JSON `payload`, o logo e o manual de marca vão como arquivos. O Cartman grava a
    resposta em transação e fecha o link.
 5. **Depois** — o mesmo link só mostra a tela "Formulário já enviado".
+
+Em 22/10/2026, a integração local foi preparada somente para leitura. O GET informa
+`submissionAvailable: false`: o formulário avisa que o envio ainda está indisponível.
+Os passos de gravação acima descrevem o contrato de persistência histórico, que não
+foi restaurado neste bloco. Nenhuma tabela, token ou resposta foi criada.
 
 ## Onde cada parte mora
 

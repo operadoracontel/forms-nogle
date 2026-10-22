@@ -83,7 +83,7 @@ const StepDominio = ({ form, errors, setField }) => {
                 value={form.domainPassword}
                 onChange={(value) => setField('domainPassword', value)}
                 error={errors.domainPassword}
-                helper="Armazenada de forma criptografada e usada só para a ativação."
+                helper="Acesso utilizado apenas para ativar o domínio do seu produto."
                 type="password"
                 autoComplete="new-password"
             />

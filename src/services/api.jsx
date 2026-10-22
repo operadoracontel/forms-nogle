@@ -36,12 +36,16 @@ Api.interceptors.request.use((config) => {
 
 // ─── Rotas públicas (token do link) ──────────────────────────────────────────
 
-/** GET /brand-form/:token — resolve o link e devolve nome da marca e produtos. */
-export const getBrandForm = (token) => Api.get(`/brand-form/${encodeURIComponent(token)}`);
+/** Nomes e IDs oficiais usados pela busca do campo de marca. */
+export const getBrandCatalog = (options = {}) => Api.get('/brand-form/catalog/brands', { timeout: 25000, ...options });
+
+/** GET /brand-form/:token — contexto ERP no corpo direto da resposta (sem wrapper). */
+export const getBrandForm = (token, options = {}) => Api.get(`/brand-form/${encodeURIComponent(token)}`, options);
 
 /** POST /brand-form/:token — envia a resposta. `formData` com `payload`, `logo`, `brandManual`. */
-export const submitBrandForm = (token, formData) =>
+export const submitBrandForm = (token, formData, options = {}) =>
     Api.post(`/brand-form/${encodeURIComponent(token)}`, formData, {
+        ...options,
         headers: { 'Content-Type': 'multipart/form-data' },
     });
 

@@ -7,7 +7,7 @@ import LinkInvalido from '../pages/Status/LinkInvalido';
 const router = createBrowserRouter([
     {
         path: '/',
-        element: <LinkInvalido />,
+        element: <FormularioPage />,
     },
     {
         path: '/:token',

@@ -6,11 +6,11 @@
         "@chakra-ui/react": "^2.8.2",
         "@emotion/react": "^11.11.4",
         "@emotion/styled": "^11.11.0",
-        "@nogle/ui": "git+https://github.com/operadoracontel/nogle-ui.git",
+        "@fontsource/figtree": "5.3.0",
+        "@fontsource/inter": "5.3.0",
         "axios": "^1.6.7",
         "framer-motion": "^11.2.4",
         "react": "^18",
-        "react-device-detect": "^2.2.3",
         "react-dom": "^18",
         "react-icons": "^5.0.1",
         "react-router-dom": "^6.22.1",
@@ -20,6 +20,8 @@
     "scripts": {
         "start": "react-scripts start",
         "build": "react-scripts build",
+        "test": "react-scripts test",
+        "lint": "eslint src --ext .js,.jsx --max-warnings=0",
         "eject": "react-scripts eject"
     },
     "eslintConfig": {

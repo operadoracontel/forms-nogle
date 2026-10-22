@@ -1,15 +1,11 @@
 // src/styles/theme.js
 import { extendTheme } from '@chakra-ui/react';
-import { nogletheme } from '@nogle/ui';
 import { colors } from './colors';
 
 /**
  * Tema Nogle — identidade visual oficial.
  *
- * A base é o `nogletheme` do @nogle/ui (design system). Sobre ele aplicamos os
- * SEMANTIC TOKENS que dão suporte a light/dark — o tema da lib ainda é dark-only,
- * então estes overrides são o que garante contraste correto nos dois modos.
- * Quando o @nogle/ui passar a expor os semantic tokens, este arquivo encolhe.
+ * Tema local do Forms sobre o Chakra, com tokens semânticos para light/dark.
  *
  *   Neon Green  #02EA75  → tecnologia / energia / AÇÕES e destaques
  *   Dark Green  #021E00  → solidez / confiança (texto sobre o neon)
@@ -117,7 +113,7 @@ const components = {
         },
     },
     Input: {
-        // O @nogle/ui aplica cor fixa no baseStyle; zeramos e devolvemos por token
+        // As cores dos campos acompanham os tokens de light/dark.
         baseStyle: { field: { bg: 'transparent', color: 'inherit', borderColor: 'inherit' } },
         variants: {
             outline: {
@@ -218,6 +214,5 @@ export default extendTheme(
         fonts,
         components,
         semanticTokens,
-    },
-    nogletheme
+    }
 );

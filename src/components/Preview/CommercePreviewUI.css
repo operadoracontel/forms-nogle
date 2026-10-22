@@ -1,0 +1,31 @@
+.commerce-preview { color: #1f2937; background: #fff; font: 13px/1.5 Inter, sans-serif; text-align: left; color-scheme: light; --product-soft: color-mix(in srgb, var(--product-primary) 9%, white); }
+.commerce-preview *, .commerce-preview *::before, .commerce-preview *::after { box-sizing: border-box; }
+.commerce-preview h1, .commerce-preview h2, .commerce-preview h3, .commerce-preview p { margin: 0; }
+.commerce-preview :where(button) { font: inherit; cursor: pointer; color: inherit; }
+.commerce-preview button:focus-visible { outline: 3px solid var(--product-ink); outline-offset: 3px; }
+.commerce-preview svg { flex-shrink: 0; }
+.commerce-preview-tag { font-size: 9px; font-weight: 500; opacity: .8; }
+.commerce-primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 43px; padding: 11px 20px; border: 0; border-radius: 9px; background: var(--product-primary); color: var(--product-on-primary) !important; font-weight: 700 !important; }
+.commerce-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 22px 0; text-align: left; }
+.commerce-field { min-width: 0; font-size: 11px; }
+.commerce-field--wide { grid-column: 1/-1; }
+.commerce-field > span { display: block; margin-bottom: 5px; color: #6b7280; }
+.commerce-field > div { display: flex; align-items: center; min-height: 43px; padding: 10px 12px; border: 1px solid #dfe3e8; border-radius: 7px; background: #fff; color: #525c69; overflow-wrap: anywhere; }
+.commerce-notice { position: sticky; z-index: 8; bottom: 12px; display: flex; align-items: flex-start; gap: 14px; max-width: 520px; margin: 16px auto; padding: 15px 18px; border: 1px solid #dce2e8; border-radius: 12px; box-shadow: 0 8px 30px #0002; background: #fff; color: #263442; font: 12px/1.6 Inter, sans-serif; }
+.commerce-notice > button { border: 0; background: transparent; padding: 3px; margin-left: auto; }
+.commerce-payment-methods { display: flex; gap: 9px; margin: 18px 0; }
+.commerce-payment-methods > button { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 16px 8px; border: 1px solid #e2e5e9; border-radius: 12px; background: #fff; font-size: 11px; }
+.commerce-payment-methods > button > svg { width: 20px; height: 20px; }
+.commerce-payment-methods > button[aria-pressed="true"] { border-color: var(--product-ink); background: var(--product-soft); color: var(--product-ink); }
+.commerce-payment-methods > button > svg:last-child:not(:first-child) { width: 13px; height: 13px; }
+.commerce-payment-example { text-align: center; border-top: 1px solid #e8ebef; padding-top: 24px; }
+.commerce-payment-example > h3 { font-size: 18px; margin-bottom: 9px; }
+.commerce-payment-example > p { max-width: 340px; margin: 0 auto; color: #6b7280; font-size: 12px; }
+.commerce-payment-example > small { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 12px 0 20px; color: #6b7280; font-size: 10px; }
+.commerce-payment-example > .commerce-primary-button { width: 100%; }
+.commerce-pix-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 130px; height: 130px; margin: 0 auto 20px; border: 1px solid #e0e4e9; border-radius: 12px; background: #f7f8fa; color: #4b5563; }
+.commerce-pix-placeholder > svg { width: 66px; height: 66px; stroke-width: 1; }
+.commerce-pix-placeholder > span { font-size: 10px; }
+.commerce-payment-value { display: block; margin: 20px 0 0; font-size: 25px; }
+.commerce-payment-illustration { width: 50px; height: 50px; margin-bottom: 15px; color: var(--product-ink); }
+.commerce-barcode { height: 65px; max-width: 270px; margin: 22px auto; background: repeating-linear-gradient(90deg, #25303d 0 2px, transparent 2px 6px, #25303d 6px 7px, transparent 7px 12px); border: 12px solid white; opacity: .55; }
